@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "projectName": "projectdna",
+  "architecture": {
+    "summary": "Architecture metadata placeholder for future governance workflows.",
+    "layers": [
+      "cli",
+      "core",
+      "memory",
+      "context",
+      "providers",
+      "validators"
+    ]
+  },
+  "dependencies": [
+    "commander",
+    "zod",
+    "fs-extra"
+  ],
+  "businessContext": {
+    "domain": "Architecture governance",
+    "goals": [
+      "Preserve architectural context",
+      "Support future AI integrations"
+    ]
+  }
+}

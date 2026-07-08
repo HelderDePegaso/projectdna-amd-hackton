@@ -1,0 +1,7 @@
+{
+  "dependencies": [
+    "commander",
+    "zod",
+    "fs-extra"
+  ]
+}
