@@ -1,0 +1,8 @@
+{
+  "projectName": "projectdna",
+  "conventions": [
+    "Prefer TypeScript for new implementation work.",
+    "Keep architecture knowledge centralized in .pdna files."
+  ],
+  "generatedAt": "2026-07-09T18:19:03.324Z"
+}

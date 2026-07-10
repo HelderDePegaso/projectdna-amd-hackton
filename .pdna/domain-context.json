@@ -1,0 +1,12 @@
+{
+  "projectName": "projectdna",
+  "domains": [],
+  "concepts": [],
+  "modules": [
+    {
+      "name": "src",
+      "path": "src"
+    }
+  ],
+  "generatedAt": "2026-07-09T18:19:03.324Z"
+}

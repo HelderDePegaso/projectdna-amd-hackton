@@ -1,7 +1,15 @@
 {
   "dependencies": [
+    "chalk",
     "commander",
+    "dotenv",
+    "execa",
+    "fs-extra",
+    "ora",
     "zod",
-    "fs-extra"
+    "@types/node",
+    "tsup",
+    "tsx",
+    "typescript"
   ]
 }

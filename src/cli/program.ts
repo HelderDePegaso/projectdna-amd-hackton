@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { runAskCommand } from '../commands/ask.js';
 import { runInitCommand } from '../commands/init.js';
+import { runProjectOverviewCommand } from '../commands/project-overview.js';
 import { runValidateCommand } from '../commands/validate.js';
 import { Logger } from '../utils/logger.js';
 
@@ -48,6 +49,20 @@ export function createProgram(): Command {
         logger.info(response);
       } catch (error) {
         logger.error(error instanceof Error ? error.message : 'Failed to validate Project DNA');
+        process.exitCode = 1;
+      }
+    });
+
+  const projectCommand = program.command('project').description('Manage Project DNA project knowledge');
+  projectCommand
+    .command('overview')
+    .description('Capture a product or technical overview and enrich Project DNA intelligence')
+    .action(async () => {
+      try {
+        const response = await runProjectOverviewCommand(process.cwd());
+        logger.success(response);
+      } catch (error) {
+        logger.error(error instanceof Error ? error.message : 'Failed to collect project overview');
         process.exitCode = 1;
       }
     });

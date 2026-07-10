@@ -1,0 +1,12 @@
+{
+  "projectName": "projectdna",
+  "decisions": [
+    {
+      "id": "initial-architecture-governance",
+      "title": "Project DNA stores architecture context rather than generating code.",
+      "rationale": "The MVP must preserve architectural DNA and prepare future AI assistance.",
+      "createdAt": "2026-07-09T18:19:03.324Z"
+    }
+  ],
+  "generatedAt": "2026-07-09T18:19:03.324Z"
+}
