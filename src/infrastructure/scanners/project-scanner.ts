@@ -23,6 +23,8 @@ export class ProjectScanner {
       path.join(absoluteRoot, 'next.config.ts'),
       path.join(absoluteRoot, 'vite.config.ts'),
       path.join(absoluteRoot, 'vite.config.js'),
+      path.join(absoluteRoot, 'vite.config.mjs'),
+      path.join(absoluteRoot, 'nest-cli.json'),
       path.join(absoluteRoot, 'angular.json'),
       path.join(absoluteRoot, 'tailwind.config.js'),
       path.join(absoluteRoot, 'tailwind.config.ts'),
