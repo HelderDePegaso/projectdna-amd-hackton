@@ -148,5 +148,5 @@ test('PDNAAIService rejects provider payloads that fail the architecture insight
     }),
     AIProviderValidationError,
   );
-  assert.match(provider.lastRequest?.promptPackage?.markdown ?? '', /architecture-insights\.json/);
+  assert.match(provider.lastRequest?.promptPackage?.markdown ?? '', /# 8\. Output Contract/);
 });

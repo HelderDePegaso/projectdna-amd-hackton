@@ -9,6 +9,7 @@
     "dotenv",
     "execa",
     "fs-extra",
+    "openai",
     "ora",
     "zod"
   ],
@@ -55,5 +56,5 @@
     "C:\\HelderFuture\\projectdna\\package.json",
     "C:\\HelderFuture\\projectdna\\tsconfig.json"
   ],
-  "generatedAt": "2026-07-09T18:19:03.323Z"
+  "generatedAt": "2026-07-11T13:12:41.594Z"
 }

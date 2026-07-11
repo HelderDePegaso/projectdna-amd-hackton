@@ -9,6 +9,7 @@
     "dotenv",
     "execa",
     "fs-extra",
+    "openai",
     "ora",
     "zod"
   ],
@@ -25,5 +26,5 @@
     "start",
     "typecheck"
   ],
-  "generatedAt": "2026-07-09T18:19:03.324Z"
+  "generatedAt": "2026-07-11T13:12:41.603Z"
 }

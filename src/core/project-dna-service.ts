@@ -31,6 +31,7 @@ export class ProjectDnaService {
   }
 
   public async projectOverview(projectRoot: string): Promise<string> {
+    debugger
     this.logger.info(`Collecting project overview for ${projectRoot}`);
     const result = await this.projectOverviewUseCase.execute(projectRoot);
 

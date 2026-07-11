@@ -37,12 +37,12 @@ export class InitializeProjectUseCase {
       projectRoot: context.projectRoot,
       architecture: {
         summary: context.architectureSummary,
-        layers: ['cli', 'application', 'domain', 'infrastructure'],
+        layers: [/*'cli', 'application', 'domain', 'infrastructure'*/],
       },
       dependencies: context.dependencies,
       businessContext: {
-        domain: 'Architecture governance',
-        goals: ['Preserve architectural context', 'Support future AI integrations'],
+        domain: '', //  Architecture governance',
+        goals: [/*'Preserve architectural context', 'Support future AI integrations'*/],
       },
       generatedAt: context.generatedAt,
       scan: scanResult,

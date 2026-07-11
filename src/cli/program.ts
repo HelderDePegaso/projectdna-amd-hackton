@@ -6,6 +6,7 @@ import { runValidateCommand } from '../commands/validate.js';
 import { Logger } from '../utils/logger.js';
 
 export function createProgram(): Command {
+  debugger
   const program = new Command();
   const logger = new Logger();
 

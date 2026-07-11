@@ -51,6 +51,8 @@ var ProjectScanner = class {
       path.join(absoluteRoot, "next.config.ts"),
       path.join(absoluteRoot, "vite.config.ts"),
       path.join(absoluteRoot, "vite.config.js"),
+      path.join(absoluteRoot, "vite.config.mjs"),
+      path.join(absoluteRoot, "nest-cli.json"),
       path.join(absoluteRoot, "angular.json"),
       path.join(absoluteRoot, "tailwind.config.js"),
       path.join(absoluteRoot, "tailwind.config.ts"),
@@ -503,12 +505,17 @@ var InitializeProjectUseCase = class {
       projectRoot: context.projectRoot,
       architecture: {
         summary: context.architectureSummary,
-        layers: ["cli", "application", "domain", "infrastructure"]
+        layers: [
+          /*'cli', 'application', 'domain', 'infrastructure'*/
+        ]
       },
       dependencies: context.dependencies,
       businessContext: {
-        domain: "Architecture governance",
-        goals: ["Preserve architectural context", "Support future AI integrations"]
+        domain: "",
+        //  Architecture governance',
+        goals: [
+          /*'Preserve architectural context', 'Support future AI integrations'*/
+        ]
       },
       generatedAt: context.generatedAt,
       scan: scanResult
@@ -1605,6 +1612,7 @@ var ProjectDnaService = class {
     return result.summary;
   }
   async projectOverview(projectRoot) {
+    debugger;
     this.logger.info(`Collecting project overview for ${projectRoot}`);
     const result = await this.projectOverviewUseCase.execute(projectRoot);
     if (result.status === "skipped") {
@@ -1643,6 +1651,7 @@ async function runValidateCommand(projectRoot) {
 
 // src/cli/program.ts
 function createProgram() {
+  debugger;
   const program2 = new Command();
   const logger = new Logger();
   program2.name("pdna").description("Project DNA CLI foundation for architecture governance").version("0.1.0");

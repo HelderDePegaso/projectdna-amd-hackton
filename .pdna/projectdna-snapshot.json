@@ -4,12 +4,7 @@
   "projectRoot": "C:\\HelderFuture\\projectdna",
   "architecture": {
     "summary": "Detected typescript stack with src source structure.",
-    "layers": [
-      "cli",
-      "application",
-      "domain",
-      "infrastructure"
-    ]
+    "layers": []
   },
   "dependencies": [
     "chalk",
@@ -17,6 +12,7 @@
     "dotenv",
     "execa",
     "fs-extra",
+    "openai",
     "ora",
     "zod",
     "@types/fs-extra",
@@ -26,13 +22,10 @@
     "typescript"
   ],
   "businessContext": {
-    "domain": "Architecture governance",
-    "goals": [
-      "Preserve architectural context",
-      "Support future AI integrations"
-    ]
+    "domain": "",
+    "goals": []
   },
-  "generatedAt": "2026-07-09T18:19:03.324Z",
+  "generatedAt": "2026-07-11T13:12:41.603Z",
   "scan": {
     "projectName": "projectdna",
     "projectRoot": "C:\\HelderFuture\\projectdna",
@@ -44,6 +37,7 @@
       "dotenv",
       "execa",
       "fs-extra",
+      "openai",
       "ora",
       "zod"
     ],
@@ -90,6 +84,6 @@
       "C:\\HelderFuture\\projectdna\\package.json",
       "C:\\HelderFuture\\projectdna\\tsconfig.json"
     ],
-    "generatedAt": "2026-07-09T18:19:03.323Z"
+    "generatedAt": "2026-07-11T13:12:41.594Z"
   }
 }
