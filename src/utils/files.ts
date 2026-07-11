@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'node:path';
 
 export async function ensureProjectDnaDirectory(projectRoot: string): Promise<string> {
-  const targetDir = path.join(projectRoot, '.project-dna');
+  const targetDir = path.join(projectRoot, '.pdna');
   await fs.ensureDir(targetDir);
   return targetDir;
 }

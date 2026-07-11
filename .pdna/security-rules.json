@@ -1,0 +1,9 @@
+{
+  "projectName": "projectdna",
+  "concerns": [
+    "Avoid storing secrets in source files.",
+    "Treat architecture knowledge as sensitive project context."
+  ],
+  "rules": [],
+  "generatedAt": "2026-07-09T18:19:03.324Z"
+}

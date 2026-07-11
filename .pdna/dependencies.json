@@ -1,0 +1,29 @@
+{
+  "projectName": "projectdna",
+  "dependencyIntent": [
+    "Project-specific implementation"
+  ],
+  "dependencies": [
+    "chalk",
+    "commander",
+    "dotenv",
+    "execa",
+    "fs-extra",
+    "ora",
+    "zod"
+  ],
+  "devDependencies": [
+    "@types/fs-extra",
+    "@types/node",
+    "tsup",
+    "tsx",
+    "typescript"
+  ],
+  "scripts": [
+    "dev",
+    "build",
+    "start",
+    "typecheck"
+  ],
+  "generatedAt": "2026-07-09T18:19:03.324Z"
+}

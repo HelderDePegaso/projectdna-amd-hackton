@@ -1,0 +1,121 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-07-09T18:23:30.415Z",
+  "generator": {
+    "provider": "fireworks",
+    "model": "fireworks-architecture-intelligence",
+    "projectDnaVersion": "0.1.0"
+  },
+  "source": {
+    "overviewProvided": true,
+    "scannerReportVersion": "2026-07-09T18:19:03.323Z",
+    "architectureVersion": "2026-07-09T18:19:03.324Z"
+  },
+  "summary": "Project DNA captured an overview and derived a structured architecture summary.",
+  "project": {
+    "name": "projectdna",
+    "language": "TypeScript",
+    "packageManager": "npm",
+    "framework": {
+      "name": "react",
+      "confidence": 0.8,
+      "evidence": [
+        "C:\\HelderFuture\\projectdna\\package.json",
+        "C:\\HelderFuture\\projectdna\\tsconfig.json"
+      ]
+    }
+  },
+  "architectureStyle": {
+    "primary": "component-based",
+    "secondary": [],
+    "reasoning": "Derived from scanner signals and project overview context."
+  },
+  "projectStructure": {
+    "layers": [],
+    "modules": [],
+    "boundaries": [],
+    "importantFolders": [
+      "src"
+    ],
+    "importantFiles": [
+      "C:\\HelderFuture\\projectdna\\package.json",
+      "C:\\HelderFuture\\projectdna\\tsconfig.json"
+    ]
+  },
+  "businessDomains": [],
+  "technicalDomains": [],
+  "relevantTechnologies": [
+    {
+      "name": "typescript",
+      "category": "tooling"
+    }
+  ],
+  "dependencyIntent": {
+    "approved": [
+      "chalk",
+      "commander",
+      "dotenv",
+      "execa",
+      "fs-extra",
+      "ora",
+      "zod"
+    ],
+    "discouraged": [],
+    "forbidden": [],
+    "reasoning": "Dependency intent is inferred from the existing dependency list and the project overview."
+  },
+  "businessIntent": {
+    "overview": "new",
+    "targetUsers": [],
+    "goals": [],
+    "coreValue": "Preserve architecture context and support future AI guidance."
+  },
+  "codingConventions": {
+    "patterns": [
+      "Prefer TypeScript for new implementation work.",
+      "Keep architecture knowledge centralized in .pdna files."
+    ],
+    "naming": [],
+    "style": [],
+    "architectureRules": []
+  },
+  "securityConcerns": [
+    {
+      "title": "Avoid storing secrets in source files.",
+      "description": "Avoid storing secrets in source files.",
+      "severity": "medium"
+    },
+    {
+      "title": "Treat architecture knowledge as sensitive project context.",
+      "description": "Treat architecture knowledge as sensitive project context.",
+      "severity": "medium"
+    }
+  ],
+  "riskAreas": [],
+  "missingContext": [],
+  "recommendedConstraints": [],
+  "importantModules": [
+    {
+      "name": "src",
+      "reason": "Discovered as a source directory."
+    }
+  ],
+  "reasoningSummary": "Fireworks architecture intelligence is operating in a structured analysis mode for Project DNA.",
+  "architecturalRecommendations": [],
+  "confidence": {
+    "score": 0.7,
+    "notes": [
+      "Generated from scanner facts and the captured overview."
+    ]
+  },
+  "evidence": {
+    "scannerSignals": [
+      "C:\\HelderFuture\\projectdna\\package.json",
+      "C:\\HelderFuture\\projectdna\\tsconfig.json"
+    ],
+    "overviewSignals": [
+      "new"
+    ],
+    "derivedSignals": []
+  }
+}

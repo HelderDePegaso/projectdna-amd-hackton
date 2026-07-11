@@ -1,0 +1,59 @@
+{
+  "projectName": "projectdna",
+  "projectRoot": "C:\\HelderFuture\\projectdna",
+  "packageName": "projectdna",
+  "packageVersion": "0.1.0",
+  "dependencies": [
+    "chalk",
+    "commander",
+    "dotenv",
+    "execa",
+    "fs-extra",
+    "ora",
+    "zod"
+  ],
+  "devDependencies": [
+    "@types/fs-extra",
+    "@types/node",
+    "tsup",
+    "tsx",
+    "typescript"
+  ],
+  "scripts": [
+    "dev",
+    "build",
+    "start",
+    "typecheck"
+  ],
+  "technologies": [
+    "typescript"
+  ],
+  "detectedFrameworks": [
+    "react"
+  ],
+  "frameworkDetection": {
+    "name": "react",
+    "confidence": "medium",
+    "evidence": [
+      "React-oriented dependency or source convention detected"
+    ]
+  },
+  "technologyDetection": [
+    {
+      "name": "typescript",
+      "category": "language",
+      "confidence": "high",
+      "evidence": [
+        "package.json dependency"
+      ]
+    }
+  ],
+  "sourceDirectories": [
+    "src"
+  ],
+  "configFiles": [
+    "C:\\HelderFuture\\projectdna\\package.json",
+    "C:\\HelderFuture\\projectdna\\tsconfig.json"
+  ],
+  "generatedAt": "2026-07-09T18:19:03.323Z"
+}

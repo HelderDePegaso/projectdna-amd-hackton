@@ -3,7 +3,7 @@
   "projectName": "projectdna",
   "projectRoot": "C:\\HelderFuture\\projectdna",
   "architecture": {
-    "summary": "Detected commander, zod, tsx, tsup stack with src source structure.",
+    "summary": "Detected typescript stack with src source structure.",
     "layers": [
       "cli",
       "application",
@@ -19,6 +19,7 @@
     "fs-extra",
     "ora",
     "zod",
+    "@types/fs-extra",
     "@types/node",
     "tsup",
     "tsx",
@@ -31,7 +32,7 @@
       "Support future AI integrations"
     ]
   },
-  "generatedAt": "2026-07-08T09:22:34.058Z",
+  "generatedAt": "2026-07-09T18:19:03.324Z",
   "scan": {
     "projectName": "projectdna",
     "projectRoot": "C:\\HelderFuture\\projectdna",
@@ -47,6 +48,7 @@
       "zod"
     ],
     "devDependencies": [
+      "@types/fs-extra",
       "@types/node",
       "tsup",
       "tsx",
@@ -59,14 +61,27 @@
       "typecheck"
     ],
     "technologies": [
-      "commander",
-      "zod",
-      "tsx",
-      "tsup"
+      "typescript"
     ],
     "detectedFrameworks": [
-      "node",
-      "esm"
+      "react"
+    ],
+    "frameworkDetection": {
+      "name": "react",
+      "confidence": "medium",
+      "evidence": [
+        "React-oriented dependency or source convention detected"
+      ]
+    },
+    "technologyDetection": [
+      {
+        "name": "typescript",
+        "category": "language",
+        "confidence": "high",
+        "evidence": [
+          "package.json dependency"
+        ]
+      }
     ],
     "sourceDirectories": [
       "src"
@@ -75,6 +90,6 @@
       "C:\\HelderFuture\\projectdna\\package.json",
       "C:\\HelderFuture\\projectdna\\tsconfig.json"
     ],
-    "generatedAt": "2026-07-08T09:22:34.057Z"
+    "generatedAt": "2026-07-09T18:19:03.323Z"
   }
 }
