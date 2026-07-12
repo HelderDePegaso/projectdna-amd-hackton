@@ -1,7 +1,10 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --use-system-ca
 
 // src/cli/program.ts
 import { Command } from "commander";
+
+// src/application/ask-context.use-case.ts
+import path3 from "path";
 
 // src/infrastructure/scanners/project-scanner.ts
 import fs from "fs-extra";
@@ -36,6 +39,8 @@ var ScanError = class extends ProjectDnaError {
 };
 
 // src/infrastructure/scanners/project-scanner.ts
+var NEXT_CONFIG_FILES = ["next.config.js", "next.config.mjs", "next.config.ts"];
+var VITE_CONFIG_FILES = ["vite.config.js", "vite.config.mjs", "vite.config.ts"];
 var ProjectScanner = class {
   async scan(projectRoot) {
     const absoluteRoot = path.resolve(projectRoot);
@@ -47,11 +52,8 @@ var ProjectScanner = class {
     const configFiles = [
       packageJsonPath,
       path.join(absoluteRoot, "tsconfig.json"),
-      path.join(absoluteRoot, "next.config.js"),
-      path.join(absoluteRoot, "next.config.ts"),
-      path.join(absoluteRoot, "vite.config.ts"),
-      path.join(absoluteRoot, "vite.config.js"),
-      path.join(absoluteRoot, "vite.config.mjs"),
+      ...NEXT_CONFIG_FILES.map((file) => path.join(absoluteRoot, file)),
+      ...VITE_CONFIG_FILES.map((file) => path.join(absoluteRoot, file)),
       path.join(absoluteRoot, "nest-cli.json"),
       path.join(absoluteRoot, "angular.json"),
       path.join(absoluteRoot, "tailwind.config.js"),
@@ -63,10 +65,12 @@ var ProjectScanner = class {
     const dependencies = Object.keys(packageJson.dependencies ?? {});
     const devDependencies = Object.keys(packageJson.devDependencies ?? {});
     const scripts = Object.keys(packageJson.scripts ?? {});
-    const technologyDetection = this.detectTechnologies({ dependencies, devDependencies, configFiles, absoluteRoot });
-    const frameworkDetection = this.detectFramework({ dependencies, devDependencies, sourceDirectories, configFiles, absoluteRoot });
+    const configurationContents = await this.readConfigurationContents(configFiles);
+    const input = { dependencies, devDependencies, configFiles, configurationContents };
+    const frameworkDetections = this.detectFrameworks(input);
+    const technologyDetection = this.detectTechnologies(input, frameworkDetections);
     return {
-      projectName: packageJson.name ?? path.basename(absoluteRoot),
+      projectName: packageJson.name ?? "",
       projectRoot: absoluteRoot,
       packageName: packageJson.name,
       packageVersion: packageJson.version,
@@ -74,71 +78,163 @@ var ProjectScanner = class {
       devDependencies,
       scripts,
       technologies: technologyDetection.map((technology) => technology.name),
-      detectedFrameworks: frameworkDetection.name === "unknown" ? [] : [frameworkDetection.name],
-      frameworkDetection,
+      detectedFrameworks: frameworkDetections.map((framework) => framework.name),
+      frameworkDetection: frameworkDetections[0] ?? {},
       technologyDetection,
       sourceDirectories,
       configFiles,
       generatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
   }
-  detectFramework(input) {
-    const evidence = [];
-    const allConfigFiles = input.configFiles.map((file) => path.basename(file));
-    if (allConfigFiles.includes("next.config.js") || allConfigFiles.includes("next.config.ts") || input.dependencies.includes("next")) {
-      evidence.push("Next.js configuration or dependency detected");
-      return { name: "nextjs", confidence: "high", evidence, version: input.dependencies.find((dep) => dep === "next") ? "dependency-based" : void 0 };
-    }
-    if (allConfigFiles.includes("angular.json") || input.dependencies.includes("@angular/core")) {
-      evidence.push("Angular configuration or dependency detected");
-      return { name: "angular", confidence: "high", evidence };
-    }
-    if (allConfigFiles.some((file) => file.includes("vite")) || input.dependencies.includes("vite") || input.devDependencies.includes("vite")) {
-      evidence.push("Vite configuration or dependency detected");
-      return { name: "vite", confidence: "medium", evidence };
-    }
-    if (input.dependencies.includes("react") || input.dependencies.includes("react-dom") || input.sourceDirectories.includes("src")) {
-      evidence.push("React-oriented dependency or source convention detected");
-      return { name: "react", confidence: "medium", evidence };
-    }
-    if (input.sourceDirectories.length > 0) {
-      evidence.push("Project source directories detected");
-      return { name: "unknown", confidence: "low", evidence };
-    }
-    return { name: "unknown", confidence: "low", evidence: ["No strong framework markers detected"] };
+  async readConfigurationContents(configFiles) {
+    const entries = await Promise.all(
+      configFiles.map(async (file) => [path.basename(file), await fs.readFile(file, "utf8").catch(() => "")])
+    );
+    return new Map(entries);
   }
-  detectTechnologies(input) {
-    const results = [];
-    const known = [
-      { name: "typescript", dependencyNames: ["typescript"], category: "language", evidence: ["package.json dependency"] },
-      { name: "javascript", dependencyNames: [""], category: "language", evidence: ["default runtime"] },
-      { name: "tailwind", dependencyNames: ["tailwindcss", "@tailwindcss/postcss"], category: "styling", evidence: ["package.json dependency"] },
-      { name: "prisma", dependencyNames: ["prisma"], category: "tool", evidence: ["package.json dependency"] },
-      { name: "eslint", dependencyNames: ["eslint"], category: "tool", evidence: ["package.json dependency"] },
-      { name: "prettier", dependencyNames: ["prettier"], category: "tool", evidence: ["package.json dependency"] },
-      { name: "vitest", dependencyNames: ["vitest"], category: "testing", evidence: ["package.json dependency"] },
-      { name: "jest", dependencyNames: ["jest"], category: "testing", evidence: ["package.json dependency"] },
-      { name: "docker", dependencyNames: ["docker"], category: "tool", evidence: ["config file"] },
-      { name: "postgresql", dependencyNames: ["pg", "postgres"], category: "database", evidence: ["package.json dependency"] },
-      { name: "redis", dependencyNames: ["redis"], category: "database", evidence: ["package.json dependency"] },
-      { name: "supabase", dependencyNames: ["@supabase/supabase-js"], category: "tool", evidence: ["package.json dependency"] },
-      { name: "firebase", dependencyNames: ["firebase"], category: "tool", evidence: ["package.json dependency"] },
-      { name: "react", dependencyNames: ["react", "react-dom"], category: "framework", evidence: ["package.json dependency"] },
-      { name: "nextjs", dependencyNames: ["next"], category: "framework", evidence: ["package.json dependency"] },
-      { name: "vite", dependencyNames: ["vite"], category: "framework", evidence: ["package.json dependency"] }
-    ];
-    const allDependencies = [...input.dependencies, ...input.devDependencies];
-    for (const entry of known) {
-      const matched = entry.dependencyNames.some((dependency) => dependency && allDependencies.includes(dependency));
-      const configMatches = entry.name === "docker" ? input.configFiles.some((file) => file.includes("docker")) : false;
-      if (matched || configMatches) {
-        results.push({ name: entry.name, category: entry.category, confidence: "high", evidence: entry.evidence });
+  detectFrameworks(input) {
+    const configFiles = new Set(input.configFiles.map((file) => path.basename(file)));
+    const dependencies = /* @__PURE__ */ new Set([...input.dependencies, ...input.devDependencies]);
+    const frameworks = [];
+    const hasNextConfig = NEXT_CONFIG_FILES.some((file) => configFiles.has(file));
+    const hasNextDependencies = ["next", "react", "react-dom"].every((dependency) => dependencies.has(dependency));
+    if (hasNextConfig && hasNextDependencies) {
+      frameworks.push({
+        name: "nextjs",
+        confidence: "high",
+        evidence: ["a Next.js configuration file and the next, react, and react-dom packages were detected"]
+      });
+    }
+    const hasAngularConfig = configFiles.has("angular.json");
+    const hasAngularDependencies = ["@angular/core", "@angular/common"].every((dependency) => dependencies.has(dependency));
+    if (hasAngularConfig && hasAngularDependencies) {
+      frameworks.push({
+        name: "angular",
+        confidence: "high",
+        evidence: ["angular.json and the @angular/core and @angular/common packages were detected"]
+      });
+    }
+    const hasNestConfig = configFiles.has("nest-cli.json");
+    const hasNestDependencies = ["@nestjs/core", "@nestjs/common"].every((dependency) => dependencies.has(dependency));
+    if (hasNestConfig && hasNestDependencies) {
+      frameworks.push({
+        name: "nestjs",
+        confidence: "high",
+        evidence: ["nest-cli.json and the @nestjs/core and @nestjs/common packages were detected"]
+      });
+    }
+    const reactPlugin = this.findReactVitePlugin(input.configurationContents);
+    const hasReactDependencies = reactPlugin !== void 0 && ["react", "react-dom", reactPlugin].every((dependency) => dependencies.has(dependency));
+    if (reactPlugin && hasReactDependencies) {
+      frameworks.push({
+        name: "react",
+        confidence: "high",
+        evidence: [`a Vite configuration uses ${reactPlugin} and its React dependency signature was detected`]
+      });
+    }
+    return frameworks;
+  }
+  findReactVitePlugin(configurationContents) {
+    for (const configFile of VITE_CONFIG_FILES) {
+      const content = configurationContents.get(configFile) ?? "";
+      if (content.includes("@vitejs/plugin-react-swc")) {
+        return "@vitejs/plugin-react-swc";
+      }
+      if (content.includes("@vitejs/plugin-react")) {
+        return "@vitejs/plugin-react";
       }
     }
-    if (results.length === 0) {
-      results.push({ name: "javascript", category: "language", confidence: "medium", evidence: ["No specific technology markers found"] });
+    return void 0;
+  }
+  detectTechnologies(input, frameworks) {
+    const results = [];
+    const known = [
+      { name: "typescript", dependencyNames: ["typescript"], configFileNames: ["tsconfig.json"], category: "language" },
+      { name: "tailwind", dependencyNames: ["tailwindcss", "@tailwindcss/postcss"], configFileNames: ["tailwind.config.js", "tailwind.config.ts"], category: "styling" },
+      { name: "prisma", dependencyNames: ["prisma"], configFileNames: ["schema.prisma"], category: "tool" },
+      { name: "eslint", dependencyNames: ["eslint"], configFileNames: [], category: "tool" },
+      { name: "prettier", dependencyNames: ["prettier"], configFileNames: [], category: "tool" },
+      { name: "vitest", dependencyNames: ["vitest"], configFileNames: [], category: "testing" },
+      { name: "jest", dependencyNames: ["jest"], configFileNames: [], category: "testing" },
+      { name: "docker", dependencyNames: [], configFileNames: ["docker-compose.yml"], category: "tool" },
+      { name: "postgresql", dependencyNames: ["pg", "postgres"], configFileNames: [], category: "database" },
+      { name: "redis", dependencyNames: ["redis"], configFileNames: [], category: "database" },
+      { name: "supabase", dependencyNames: ["@supabase/supabase-js"], configFileNames: [], category: "tool" },
+      { name: "firebase", dependencyNames: ["firebase"], configFileNames: [], category: "tool" },
+      { name: "vite", dependencyNames: ["vite"], configFileNames: VITE_CONFIG_FILES, category: "tool" }
+    ];
+    const allDependencies = /* @__PURE__ */ new Set([...input.dependencies, ...input.devDependencies]);
+    const configFiles = new Set(input.configFiles.map((file) => path.basename(file)));
+    for (const entry of known) {
+      const dependencyMatched = entry.dependencyNames.some((dependency) => allDependencies.has(dependency));
+      const configMatched = entry.configFileNames.some((configFile) => configFiles.has(configFile));
+      if (dependencyMatched || configMatched) {
+        results.push({
+          name: entry.name,
+          category: entry.category,
+          confidence: "high",
+          evidence: [dependencyMatched ? "package.json dependency" : "framework-specific configuration file"]
+        });
+      }
+    }
+    for (const framework of frameworks) {
+      if (framework.name) {
+        results.push({
+          name: framework.name,
+          category: "framework",
+          confidence: framework.confidence ?? "high",
+          evidence: framework.evidence ?? []
+        });
+      }
     }
     return results;
+  }
+};
+
+// src/shared/project-validation.ts
+import fs2 from "fs-extra";
+import path2 from "path";
+var ProjectValidationService = class {
+  async validateWorkspace(projectRoot) {
+    const absoluteRoot = path2.resolve(projectRoot);
+    const stats = await fs2.stat(absoluteRoot).catch(() => {
+      throw new ScanError(`Project root does not exist: ${absoluteRoot}`);
+    });
+    if (!stats.isDirectory()) {
+      throw new ScanError(`Project root is not a directory: ${absoluteRoot}`);
+    }
+    const packageJsonPath = path2.join(absoluteRoot, "package.json");
+    if (!await fs2.pathExists(packageJsonPath)) {
+      throw new ScanError(`Missing package.json in project root: ${absoluteRoot}`);
+    }
+    await fs2.access(absoluteRoot, fs2.constants.R_OK | fs2.constants.W_OK).catch(() => {
+      throw new ProjectDnaError(`Insufficient permissions to read/write the project root: ${absoluteRoot}`);
+    });
+    return absoluteRoot;
+  }
+  async validateProjectDnaInitialized(projectRoot, targetDirectoryName = ".pdna") {
+    const absoluteRoot = await this.validateWorkspace(projectRoot);
+    const targetDir = path2.join(absoluteRoot, targetDirectoryName);
+    if (!await fs2.pathExists(targetDir)) {
+      throw new ProjectDnaError(`Project DNA has not been initialized. Run \`pdna init\` before using this command.`);
+    }
+    const targetStats = await fs2.stat(targetDir);
+    if (!targetStats.isDirectory()) {
+      throw new ProjectDnaError(`A file exists at ${targetDir} and blocks Project DNA usage.`);
+    }
+    return absoluteRoot;
+  }
+  async validateProjectDnaCanBeInitialized(projectRoot, targetDirectoryName = ".pdna") {
+    const absoluteRoot = await this.validateWorkspace(projectRoot);
+    const targetDir = path2.join(absoluteRoot, targetDirectoryName);
+    if (await fs2.pathExists(targetDir)) {
+      const targetStats = await fs2.stat(targetDir);
+      if (targetStats.isDirectory()) {
+        throw new ProjectDnaError(`Project DNA is already initialized at ${targetDir}.`);
+      }
+      throw new ProjectDnaError(`A file exists at ${targetDir} and blocks Project DNA initialization.`);
+    }
+    return absoluteRoot;
   }
 };
 
@@ -152,35 +248,33 @@ var ProjectContextResolver = class {
       frameworks: scanResult.detectedFrameworks,
       dependencies: [...scanResult.dependencies, ...scanResult.devDependencies],
       sourceDirectories: scanResult.sourceDirectories,
-      architectureSummary: this.buildArchitectureSummary(scanResult),
+      architectureSummary: "",
       generatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
-  }
-  // TODO () : Fazer isso com IA
-  buildArchitectureSummary(scanResult) {
-    const layers = ["cli", "application", "domain", "infrastructure"];
-    return `Detected ${scanResult.technologies.length > 0 ? scanResult.technologies.join(", ") : "general"} stack with ${scanResult.sourceDirectories.length > 0 ? scanResult.sourceDirectories.join(", ") : "standard"} source structure.`;
   }
 };
 
 // src/application/ask-context.use-case.ts
 var AskContextUseCase = class {
-  constructor(scanner = new ProjectScanner(), resolver = new ProjectContextResolver()) {
+  constructor(scanner = new ProjectScanner(), resolver = new ProjectContextResolver(), validationService = new ProjectValidationService()) {
     this.scanner = scanner;
     this.resolver = resolver;
+    this.validationService = validationService;
   }
   scanner;
   resolver;
+  validationService;
   async execute(projectRoot) {
-    const scanResult = await this.scanner.scan(projectRoot);
+    const absoluteRoot = await this.validationService.validateProjectDnaInitialized(path3.resolve(projectRoot));
+    const scanResult = await this.scanner.scan(absoluteRoot);
     const context = this.resolver.resolve(scanResult);
     return `Architecture context for ${context.projectName}: ${context.architectureSummary}`;
   }
 };
 
 // src/infrastructure/repositories/file-memory-repository.ts
-import path2 from "path";
-import fs2 from "fs-extra";
+import path4 from "path";
+import fs3 from "fs-extra";
 var FileMemoryRepository = class {
   constructor(rootDir) {
     this.rootDir = rootDir;
@@ -188,16 +282,16 @@ var FileMemoryRepository = class {
   rootDir;
   async saveSnapshot(snapshot) {
     try {
-      await fs2.ensureDir(this.rootDir);
-      const filePath = path2.join(this.rootDir, `${snapshot.projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-snapshot.json`);
-      await fs2.writeJson(filePath, snapshot, { spaces: 2 });
+      await fs3.ensureDir(this.rootDir);
+      const filePath = path4.join(this.rootDir, `${snapshot.projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-snapshot.json`);
+      await fs3.writeJson(filePath, snapshot, { spaces: 2 });
     } catch (error) {
       throw new MemoryRepositoryError(`Failed to save memory snapshot: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   async loadLatest(projectId) {
     try {
-      const files = await fs2.readdir(this.rootDir);
+      const files = await fs3.readdir(this.rootDir);
       const matches = files.filter((file) => file.includes(projectId.toLowerCase()));
       if (matches.length === 0) {
         return null;
@@ -206,16 +300,16 @@ var FileMemoryRepository = class {
       if (!latestFile) {
         return null;
       }
-      return await fs2.readJson(path2.join(this.rootDir, latestFile));
+      return await fs3.readJson(path4.join(this.rootDir, latestFile));
     } catch (error) {
       throw new MemoryRepositoryError(`Failed to load memory snapshot: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   async listHistory(projectId) {
     try {
-      const files = await fs2.readdir(this.rootDir);
+      const files = await fs3.readdir(this.rootDir);
       const matches = files.filter((file) => file.includes(projectId.toLowerCase()));
-      return await Promise.all(matches.map(async (file) => fs2.readJson(path2.join(this.rootDir, file))));
+      return await Promise.all(matches.map(async (file) => fs3.readJson(path4.join(this.rootDir, file))));
     } catch (error) {
       throw new MemoryRepositoryError(`Failed to list memory history: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -223,7 +317,7 @@ var FileMemoryRepository = class {
 };
 
 // src/shared/configuration.service.ts
-import path3 from "path";
+import path5 from "path";
 import { config as loadEnv } from "dotenv";
 import { z } from "zod";
 loadEnv();
@@ -245,7 +339,7 @@ var EnvironmentConfigurationService = class {
     }
     this.configuration = {
       ...parsed.data,
-      memoryDirectory: path3.normalize(parsed.data.memoryDirectory)
+      memoryDirectory: path5.normalize(parsed.data.memoryDirectory)
     };
   }
   get(key, fallback) {
@@ -281,48 +375,17 @@ var Logger = class {
 };
 
 // src/application/initialize-project.use-case.ts
-import path7 from "path";
-
-// src/shared/project-validation.ts
-import fs3 from "fs-extra";
-import path4 from "path";
-var ProjectValidationService = class {
-  async validateWorkspace(projectRoot, targetDirectoryName = ".pdna") {
-    const absoluteRoot = path4.resolve(projectRoot);
-    const stats = await fs3.stat(absoluteRoot).catch(() => {
-      throw new ScanError(`Project root does not exist: ${absoluteRoot}`);
-    });
-    if (!stats.isDirectory()) {
-      throw new ScanError(`Project root is not a directory: ${absoluteRoot}`);
-    }
-    const packageJsonPath = path4.join(absoluteRoot, "package.json");
-    if (!await fs3.pathExists(packageJsonPath)) {
-      throw new ScanError(`Missing package.json in project root: ${absoluteRoot}`);
-    }
-    const targetDir = path4.join(absoluteRoot, targetDirectoryName);
-    if (await fs3.pathExists(targetDir)) {
-      const targetStats = await fs3.stat(targetDir);
-      if (targetStats.isDirectory()) {
-        return absoluteRoot;
-      }
-      throw new ProjectDnaError(`A file exists at ${targetDir} and blocks Project DNA initialization.`);
-    }
-    await fs3.access(absoluteRoot, fs3.constants.R_OK | fs3.constants.W_OK).catch(() => {
-      throw new ProjectDnaError(`Insufficient permissions to read/write the project root: ${absoluteRoot}`);
-    });
-    return absoluteRoot;
-  }
-};
+import path8 from "path";
 
 // src/application/dna-builder.ts
 import fs5 from "fs-extra";
-import path6 from "path";
+import path7 from "path";
 
 // src/utils/files.ts
 import fs4 from "fs-extra";
-import path5 from "path";
+import path6 from "path";
 async function ensureProjectDnaDirectory(projectRoot) {
-  const targetDir = path5.join(projectRoot, ".pdna");
+  const targetDir = path6.join(projectRoot, ".pdna");
   await fs4.ensureDir(targetDir);
   return targetDir;
 }
@@ -333,26 +396,22 @@ async function writeJsonFile(filePath, data) {
 // src/application/dna-builder.ts
 var ProjectDnaBuilder = class {
   async build(projectRoot, scanResult, context) {
-    const absoluteRoot = path6.resolve(projectRoot);
+    const absoluteRoot = path7.resolve(projectRoot);
     const projectDnaDir = await ensureProjectDnaDirectory(absoluteRoot);
     const architecture = {
       projectName: context.projectName,
       projectRoot: absoluteRoot,
-      architectureStyle: this.inferArchitectureStyle(scanResult),
-      layers: ["presentation", "application", "domain", "infrastructure"],
-      frameworkDetection: scanResult.frameworkDetection,
+      architectureStyle: "",
+      layers: [],
+      frameworkDetection: scanResult.frameworkDetection.name ? scanResult.frameworkDetection : {},
       technologyDetection: scanResult.technologyDetection,
-      rules: [
-        "Preserve architectural intent over implementation convenience.",
-        "Keep architectural knowledge in .pdna files.",
-        "Avoid code generation during architecture governance."
-      ],
-      summary: context.architectureSummary,
+      rules: [],
+      summary: "",
       generatedAt: context.generatedAt
     };
     const dependencies = {
       projectName: context.projectName,
-      dependencyIntent: this.inferDependencyIntent(scanResult),
+      dependencyIntent: [],
       dependencies: scanResult.dependencies,
       devDependencies: scanResult.devDependencies,
       scripts: scanResult.scripts,
@@ -360,8 +419,8 @@ var ProjectDnaBuilder = class {
     };
     const businessContext = {
       projectName: context.projectName,
-      summary: "Project DNA captures architectural intent and product context for future AI assistance.",
-      goals: ["Preserve architectural DNA", "Prevent architectural hallucinations", "Support future AI coding assistants"],
+      summary: "",
+      goals: [],
       domains: [],
       generatedAt: context.generatedAt
     };
@@ -369,17 +428,17 @@ var ProjectDnaBuilder = class {
       projectName: context.projectName,
       domains: [],
       concepts: [],
-      modules: scanResult.sourceDirectories.map((directory) => ({ name: directory, path: directory })),
+      modules: [],
       generatedAt: context.generatedAt
     };
     const codingRules = {
       projectName: context.projectName,
-      conventions: ["Prefer TypeScript for new implementation work.", "Keep architecture knowledge centralized in .pdna files."],
+      conventions: [],
       generatedAt: context.generatedAt
     };
     const securityRules = {
       projectName: context.projectName,
-      concerns: ["Avoid storing secrets in source files.", "Treat architecture knowledge as sensitive project context."],
+      concerns: [],
       rules: [],
       generatedAt: context.generatedAt
     };
@@ -390,93 +449,61 @@ var ProjectDnaBuilder = class {
     };
     const decisionLog = {
       projectName: context.projectName,
-      decisions: [
-        {
-          id: "initial-architecture-governance",
-          title: "Project DNA stores architecture context rather than generating code.",
-          rationale: "The MVP must preserve architectural DNA and prepare future AI assistance.",
-          createdAt: context.generatedAt
-        }
-      ],
+      decisions: [],
       generatedAt: context.generatedAt
     };
     const architectureInsights = {
       projectName: context.projectName,
       status: "pending",
-      architectureStyle: this.inferArchitectureStyle(scanResult),
+      architectureStyle: "",
       businessDomains: [],
       technicalDomains: [],
       relevantFrameworks: context.frameworks,
       relevantTechnologies: context.technologies,
-      dependencyIntent: this.inferDependencyIntent(scanResult),
-      businessIntent: ["Preserve architecture context", "Support future AI guidance"],
-      codingConventions: codingRules.conventions,
-      securityConcerns: securityRules.concerns,
+      dependencyIntent: [],
+      businessIntent: [],
+      codingConventions: [],
+      securityConcerns: [],
       riskAreas: [],
       missingContext: [],
-      recommendedConstraints: ["Keep architecture knowledge in .pdna files.", "Do not merge scanner facts with AI insights."],
-      importantModules: scanResult.sourceDirectories,
-      reasoningSummary: "Architecture insights will be generated after project overview is captured.",
+      recommendedConstraints: [],
+      importantModules: [],
+      reasoningSummary: "",
       architecturalRecommendations: [],
       generatedAt: context.generatedAt
     };
-    const overviewPath = path6.join(projectDnaDir, "project-overview.md");
+    const overviewPath = path7.join(projectDnaDir, "project-overview.md");
     await fs5.writeFile(overviewPath, "# Project Overview\n\n");
-    await writeJsonFile(path6.join(projectDnaDir, "architecture.json"), architecture);
-    await writeJsonFile(path6.join(projectDnaDir, "dependencies.json"), dependencies);
-    await writeJsonFile(path6.join(projectDnaDir, "business-context.json"), businessContext);
-    await writeJsonFile(path6.join(projectDnaDir, "domain-context.json"), domainContext);
-    await writeJsonFile(path6.join(projectDnaDir, "coding-rules.json"), codingRules);
-    await writeJsonFile(path6.join(projectDnaDir, "security-rules.json"), securityRules);
-    await writeJsonFile(path6.join(projectDnaDir, "api-conventions.json"), apiConventions);
-    await writeJsonFile(path6.join(projectDnaDir, "decision-log.json"), decisionLog);
-    await writeJsonFile(path6.join(projectDnaDir, "scanner-report.json"), scanResult);
-    await writeJsonFile(path6.join(projectDnaDir, "architecture-insights.json"), architectureInsights);
+    await writeJsonFile(path7.join(projectDnaDir, "architecture.json"), architecture);
+    await writeJsonFile(path7.join(projectDnaDir, "dependencies.json"), dependencies);
+    await writeJsonFile(path7.join(projectDnaDir, "business-context.json"), businessContext);
+    await writeJsonFile(path7.join(projectDnaDir, "domain-context.json"), domainContext);
+    await writeJsonFile(path7.join(projectDnaDir, "coding-rules.json"), codingRules);
+    await writeJsonFile(path7.join(projectDnaDir, "security-rules.json"), securityRules);
+    await writeJsonFile(path7.join(projectDnaDir, "api-conventions.json"), apiConventions);
+    await writeJsonFile(path7.join(projectDnaDir, "decision-log.json"), decisionLog);
+    await writeJsonFile(path7.join(projectDnaDir, "scanner-report.json"), scanResult);
+    await writeJsonFile(path7.join(projectDnaDir, "architecture-insights.json"), architectureInsights);
     return {
-      architecture: path6.join(projectDnaDir, "architecture.json"),
-      dependencies: path6.join(projectDnaDir, "dependencies.json"),
-      businessContext: path6.join(projectDnaDir, "business-context.json"),
-      domainContext: path6.join(projectDnaDir, "domain-context.json"),
-      codingRules: path6.join(projectDnaDir, "coding-rules.json"),
-      securityRules: path6.join(projectDnaDir, "security-rules.json"),
-      apiConventions: path6.join(projectDnaDir, "api-conventions.json"),
-      decisionLog: path6.join(projectDnaDir, "decision-log.json"),
-      scannerReport: path6.join(projectDnaDir, "scanner-report.json"),
-      architectureInsights: path6.join(projectDnaDir, "architecture-insights.json"),
+      architecture: path7.join(projectDnaDir, "architecture.json"),
+      dependencies: path7.join(projectDnaDir, "dependencies.json"),
+      businessContext: path7.join(projectDnaDir, "business-context.json"),
+      domainContext: path7.join(projectDnaDir, "domain-context.json"),
+      codingRules: path7.join(projectDnaDir, "coding-rules.json"),
+      securityRules: path7.join(projectDnaDir, "security-rules.json"),
+      apiConventions: path7.join(projectDnaDir, "api-conventions.json"),
+      decisionLog: path7.join(projectDnaDir, "decision-log.json"),
+      scannerReport: path7.join(projectDnaDir, "scanner-report.json"),
+      architectureInsights: path7.join(projectDnaDir, "architecture-insights.json"),
       projectOverview: overviewPath,
       projectDnaDirectory: projectDnaDir
     };
-  }
-  inferArchitectureStyle(scanResult) {
-    if (scanResult.detectedFrameworks.some((framework) => framework === "nextjs" || framework === "react" || framework === "vue")) {
-      return "component-based";
-    }
-    if (scanResult.sourceDirectories.length > 0) {
-      return "layered";
-    }
-    return "unknown";
-  }
-  inferDependencyIntent(scanResult) {
-    const intents = [];
-    if (scanResult.dependencies.some((dependency) => ["react", "next", "vue", "svelte"].includes(dependency))) {
-      intents.push("UI delivery");
-    }
-    if (scanResult.dependencies.some((dependency) => ["express", "koa", "fastify", "hono"].includes(dependency))) {
-      intents.push("HTTP services");
-    }
-    if (scanResult.dependencies.some((dependency) => ["prisma", "typeorm", "mongoose", "sequelize"].includes(dependency))) {
-      intents.push("Data persistence");
-    }
-    if (intents.length === 0) {
-      intents.push("Project-specific implementation");
-    }
-    return intents;
   }
 };
 
 // src/application/initialize-project.use-case.ts
 var InitializeProjectUseCase = class {
-  constructor(scanner = new ProjectScanner(), resolver = new ProjectContextResolver(), memoryRepository = new FileMemoryRepository(".pdna"), configurationService = new EnvironmentConfigurationService(), validationService = new ProjectValidationService(), dnaBuilder = new ProjectDnaBuilder(), logger = new Logger()) {
+  constructor(scanner = new ProjectScanner(), resolver = new ProjectContextResolver(), memoryRepository, configurationService = new EnvironmentConfigurationService(), validationService = new ProjectValidationService(), dnaBuilder = new ProjectDnaBuilder(), logger = new Logger()) {
     this.scanner = scanner;
     this.resolver = resolver;
     this.memoryRepository = memoryRepository;
@@ -493,9 +520,9 @@ var InitializeProjectUseCase = class {
   dnaBuilder;
   logger;
   async execute(projectRoot) {
-    const absoluteRoot = path7.resolve(projectRoot);
-    const memoryDirectory = this.configurationService.get("memoryDirectory", ".project-dna");
-    await this.validationService.validateWorkspace(absoluteRoot);
+    const absoluteRoot = path8.resolve(projectRoot);
+    const memoryDirectory = this.configurationService.get("memoryDirectory", ".pdna");
+    await this.validationService.validateProjectDnaCanBeInitialized(absoluteRoot);
     const scanResult = await this.scanner.scan(absoluteRoot);
     const context = this.resolver.resolve(scanResult);
     const files = await this.dnaBuilder.build(absoluteRoot, scanResult, context);
@@ -505,30 +532,33 @@ var InitializeProjectUseCase = class {
       projectRoot: context.projectRoot,
       architecture: {
         summary: context.architectureSummary,
-        layers: [
-          /*'cli', 'application', 'domain', 'infrastructure'*/
-        ]
+        layers: []
       },
       dependencies: context.dependencies,
       businessContext: {
         domain: "",
-        //  Architecture governance',
-        goals: [
-          /*'Preserve architectural context', 'Support future AI integrations'*/
-        ]
+        goals: []
       },
       generatedAt: context.generatedAt,
       scan: scanResult
     };
-    await this.memoryRepository.saveSnapshot(snapshot);
+    const snapshotDirectory = path8.isAbsolute(memoryDirectory) ? memoryDirectory : path8.join(absoluteRoot, memoryDirectory);
+    const memoryRepository = this.memoryRepository ?? new FileMemoryRepository(snapshotDirectory);
+    await memoryRepository.saveSnapshot(snapshot);
     this.logger.success(`Initialized Project DNA using ${memoryDirectory}`);
     return files;
   }
 };
 
 // src/application/validate-output.use-case.ts
+import path9 from "path";
 var ValidateOutputUseCase = class {
-  execute() {
+  constructor(validationService = new ProjectValidationService()) {
+    this.validationService = validationService;
+  }
+  validationService;
+  async execute(projectRoot) {
+    await this.validationService.validateProjectDnaInitialized(path9.resolve(projectRoot));
     return {
       isValid: true,
       summary: "Project DNA validation pipeline initialized.",
@@ -539,7 +569,7 @@ var ValidateOutputUseCase = class {
 
 // src/application/project-overview.use-case.ts
 import fs6 from "fs-extra";
-import path8 from "path";
+import path10 from "path";
 import readline from "readline/promises";
 
 // src/ai/fireworks.service.ts
@@ -557,9 +587,78 @@ var AIProviderExecutionError = class extends Error {
   }
 };
 
-// src/ai/fireworks.service.ts
+// src/ai/environment.service.ts
+import { config as loadEnv2 } from "dotenv";
 var DEFAULT_FIREWORKS_BASE_URL = "https://api.fireworks.ai/inference/v1";
 var DEFAULT_FIREWORKS_MODEL = "accounts/fireworks/models/llama-v3p1-70b-instruct";
+var DEFAULT_AI_TIMEOUT_MS = 6e4;
+var DEFAULT_AI_TEMPERATURE = 0.2;
+loadEnv2();
+var EnvironmentService = class {
+  constructor(values = process.env) {
+    this.values = values;
+  }
+  values;
+  getProvider() {
+    return this.getValue("PDNA_PROVIDER", "PDNA_DEFAULT_PROVIDER") ?? "fireworks";
+  }
+  getOptionalApiKey() {
+    return this.getValue("PDNA_FIREWORKS_API_KEY", "FIREWORKS_API_KEY");
+  }
+  getApiKey() {
+    const apiKey = this.getOptionalApiKey();
+    if (!apiKey) {
+      throw new EnvironmentConfigurationError("Environment variable PDNA_FIREWORKS_API_KEY or FIREWORKS_API_KEY is not configured.");
+    }
+    return apiKey;
+  }
+  getOptionalFireworksApiKey() {
+    return this.getOptionalApiKey();
+  }
+  getFireworksApiKey() {
+    return this.getApiKey();
+  }
+  getModel() {
+    return this.getValue("PDNA_FIREWORKS_MODEL", "FIREWORKS_MODEL") ?? DEFAULT_FIREWORKS_MODEL;
+  }
+  getBaseUrl() {
+    return this.getValue("PDNA_FIREWORKS_BASE_URL", "FIREWORKS_BASE_URL") ?? DEFAULT_FIREWORKS_BASE_URL;
+  }
+  getTimeout() {
+    return this.getNumber("PDNA_FIREWORKS_TIMEOUT_MS", "FIREWORKS_TIMEOUT_MS", DEFAULT_AI_TIMEOUT_MS, (value) => Number.isInteger(value) && value > 0);
+  }
+  getTemperature() {
+    return this.getNumber("PDNA_FIREWORKS_TEMPERATURE", "FIREWORKS_TEMPERATURE", DEFAULT_AI_TEMPERATURE, (value) => value >= 0 && value <= 2);
+  }
+  getValue(...keys) {
+    for (const key of keys) {
+      const value = this.values[key]?.trim();
+      if (value) {
+        return value;
+      }
+    }
+    return void 0;
+  }
+  getNumber(primaryKey, legacyKey, fallback, isValid) {
+    const rawValue = this.getValue(primaryKey, legacyKey);
+    if (!rawValue) {
+      return fallback;
+    }
+    const value = Number(rawValue);
+    if (!Number.isFinite(value) || !isValid(value)) {
+      throw new EnvironmentConfigurationError(`Environment variable ${primaryKey} or ${legacyKey} must be a valid numeric value.`);
+    }
+    return value;
+  }
+};
+var EnvironmentConfigurationError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "EnvironmentConfigurationError";
+  }
+};
+
+// src/ai/fireworks.service.ts
 var DEFAULT_PROJECT_DNA_VERSION = "0.1.0";
 var FireworksService = class {
   providerId = "fireworks";
@@ -567,12 +666,17 @@ var FireworksService = class {
   apiKey;
   baseURL;
   model;
+  temperature;
+  timeoutMs;
   projectDnaVersion;
   providedClient;
   constructor(options = {}) {
-    this.apiKey = options.apiKey ?? process.env.FIREWORKS_API_KEY;
-    this.baseURL = options.baseURL ?? process.env.FIREWORKS_BASE_URL ?? DEFAULT_FIREWORKS_BASE_URL;
-    this.model = options.model ?? process.env.FIREWORKS_MODEL ?? DEFAULT_FIREWORKS_MODEL;
+    const environment = options.environment ?? new EnvironmentService();
+    this.apiKey = options.apiKey ?? environment.getOptionalFireworksApiKey();
+    this.baseURL = options.baseURL ?? environment.getBaseUrl();
+    this.model = options.model ?? environment.getModel();
+    this.temperature = options.temperature ?? environment.getTemperature();
+    this.timeoutMs = options.timeoutMs ?? environment.getTimeout();
     this.projectDnaVersion = options.projectDnaVersion ?? DEFAULT_PROJECT_DNA_VERSION;
     this.providedClient = options.client;
   }
@@ -580,14 +684,14 @@ var FireworksService = class {
     if (!this.apiKey && !this.providedClient) {
       return {
         available: false,
-        message: "Missing FIREWORKS_API_KEY environment variable.",
-        metadata: { model: this.model, baseURL: this.baseURL }
+        message: "Missing PDNA_FIREWORKS_API_KEY or FIREWORKS_API_KEY environment variable.",
+        metadata: this.getConfigurationMetadata()
       };
     }
     return {
       available: true,
       message: "Fireworks provider is configured.",
-      metadata: { model: this.model, baseURL: this.baseURL }
+      metadata: this.getConfigurationMetadata()
     };
   }
   getCapabilities() {
@@ -597,7 +701,9 @@ var FireworksService = class {
       supportedModes: ["overview-analysis", "prompt-enrichment"],
       metadata: {
         model: this.model,
-        responseFormat: "json_object"
+        responseFormat: "json_object",
+        temperature: this.temperature,
+        timeoutMs: this.timeoutMs
       }
     };
   }
@@ -609,7 +715,7 @@ var FireworksService = class {
     try {
       const response = await this.getClient().chat.completions.create({
         model: this.model,
-        temperature: 0.2,
+        temperature: this.temperature,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: this.buildProviderSystemPrompt(request) },
@@ -625,7 +731,8 @@ var FireworksService = class {
       if (error instanceof AIProviderExecutionError) {
         throw error;
       }
-      throw new AIProviderExecutionError(this.providerId, `Fireworks failed to execute ${request.mode ?? "structured"} analysis.`, error);
+      const details = this.describeProviderError(error);
+      throw new AIProviderExecutionError(this.providerId, `Fireworks failed to execute ${request.mode ?? "structured"} analysis.${details}`, error);
     }
   }
   getClient() {
@@ -634,8 +741,24 @@ var FireworksService = class {
     }
     return new OpenAI({
       apiKey: this.apiKey,
-      baseURL: this.baseURL
+      baseURL: this.baseURL,
+      timeout: this.timeoutMs
     });
+  }
+  getConfigurationMetadata() {
+    return {
+      model: this.model,
+      baseURL: this.baseURL,
+      temperature: this.temperature,
+      timeoutMs: this.timeoutMs
+    };
+  }
+  describeProviderError(error) {
+    if (!(error instanceof Error)) {
+      return "";
+    }
+    const cause = error.cause instanceof Error ? ` Cause: ${error.cause.message}` : "";
+    return ` ${error.name}: ${error.message}.${cause}`;
   }
   buildSystemPrompt() {
     return [
@@ -1253,29 +1376,63 @@ ${userPrompt}`,
       "# 1. System Role",
       "You are the Project DNA Prompt Enrichment Agent running through Fireworks.",
       "You are not a code generator and you are not a generic chat assistant.",
-      "Your job is to transform the user request into a project-aware, architecture-aware, domain-aware prompt for an external AI coding assistant.",
+      "Think like an architecture analyst whose output will guide a separate AI coding assistant.",
+      "Your job is to transform the user request into a project-aware, architecture-aware, domain-aware prompt that reduces hallucination and preserves Project DNA constraints.",
       "",
       "# 2. Mission",
-      "Infer the relevant project domains and context from the supplied Project DNA artifacts.",
-      "Use that inference to enrich the original user request into a final Markdown prompt.",
+      "Analyze the user request, select only relevant Project DNA evidence, and use that evidence to enrich the original request into a final Markdown prompt.",
       "Return structured JSON only. The final enriched prompt must be inside enrichedPrompt.markdown.",
       "",
-      "# 3. Evidence Priority",
-      "- Use scanner facts for technical reality.",
-      "- Use business-context.json for product and business meaning.",
-      "- Use domain-context.json for domain selection and canonical domain names.",
-      "- Use architecture-insights.json for architecture style, constraints, risks, and important modules.",
-      "- Use coding-rules.json, api-conventions.json, and optionally security-rules.json as implementation boundaries.",
-      "- Do not invent dependencies, modules, domains, architecture patterns, or file paths.",
+      "# 3. Reasoning Protocol",
+      "Before producing the JSON, perform this reasoning internally and reflect the important conclusions in the JSON fields:",
+      "1. Intent analysis: determine what the user wants, the software concern involved, the modification type, and the likely technical area affected.",
+      "2. Evidence inventory: separate Facts, Inference, and Missing Context from the supplied artifacts.",
+      "3. Artifact selection: decide which Project DNA artifacts are relevant for this request before selecting domains or dependencies.",
+      "4. Domain selection: select only domains that are directly relevant to the request and supported by evidence.",
+      "5. Evidence ranking: prefer high-confidence evidence, report conflicts, and lower confidence when evidence is weak or ambiguous.",
+      "6. Prompt synthesis: convert selected project knowledge into actionable implementation guidance for another AI coding assistant.",
       "",
-      "# 4. Non-Goals",
+      "# 4. Evidence Rules",
+      "- A Fact is directly present in the supplied Project DNA artifacts.",
+      "- An Inference is derived from multiple facts. Never present an inference as a confirmed fact.",
+      "- Missing Context is information that cannot be safely inferred from the supplied artifacts.",
+      "- Every important conclusion must be traceable to supplied artifacts.",
+      "- Do not invent domains, dependencies, modules, architecture styles, project conventions, file names, technologies, APIs, or storage locations.",
+      "- If evidence is insufficient, say so explicitly in enrichedPrompt.missingContext and confidence.notes.",
+      "- If two artifacts conflict, report the conflict in enrichedPrompt.warnings and confidence.notes instead of silently resolving it.",
+      "",
+      "# 5. Evidence Priority",
+      "- Architecture rules and architecture-insights.json are first-class evidence and outrank generic programming knowledge.",
+      "- coding-rules.json, api-conventions.json, security-rules.json, and architecture-insights.json constrain every implementation recommendation.",
+      "- Use scanner facts for technical reality: detected technologies, dependencies, source directories, scripts, and configuration files.",
+      "- Use business-context.json for product goals, users, and business meaning.",
+      "- Use domain-context.json for canonical domain names and domain concepts.",
+      "- Use dependencies.json and scanner dependency facts only for dependencies that actually appear in the artifacts.",
+      "- Use decision-log.json for prior architectural decisions when relevant to the request.",
+      "",
+      "# 6. Domain Selection Rules",
+      "- Do not copy all available domains.",
+      "- Select a domain only when the request meaning and artifact evidence both support it.",
+      "- For each selectedDomains item, reason must include why it was selected and a confidence label: high, medium, or low.",
+      "- For each selectedDomains item, evidence must cite the supporting artifact names and concise evidence statements.",
+      "- Ignore domains that are plausible in general but unsupported by the current request and artifacts.",
+      "",
+      "# 7. Conservative Assumptions",
+      "- When the request is ambiguous, explain the ambiguity.",
+      "- Choose the most likely interpretation only when evidence supports it.",
+      "- Report credible alternative interpretations in enrichedPrompt.missingContext or enrichedPrompt.warnings.",
+      "- Reduce confidence when relying on inference or when artifacts are sparse.",
+      "",
+      "# 8. Non-Goals",
       "- Do not write implementation code.",
       "- Do not output shell commands.",
       "- Do not redesign Project DNA.",
       "- Do not emit markdown outside the required JSON object.",
       "",
-      "# 5. Missing Context Policy",
-      "If evidence is insufficient, explicitly report missing context in enrichedPrompt.missingContext and confidence.notes."
+      "# 9. Output Philosophy",
+      "The enriched prompt must not merely repeat project information.",
+      "Every section must turn relevant evidence into useful guidance for another coding model.",
+      "Avoid redundancy, generic explanations, and unsupported recommendations."
     ].join("\n");
   }
   buildUserPrompt(input, compactContext) {
@@ -1292,19 +1449,40 @@ ${userPrompt}`,
       "# Included Security Rules",
       String(input.includeSecurity),
       "",
+      "# Required Internal Reasoning",
+      "Perform the following analysis before writing the JSON response:",
+      "- Intent Analysis: identify the user goal, software concern, requested modification type, and affected technical area.",
+      "- Artifact Relevance: decide which supplied artifacts matter for this request and ignore unrelated artifacts.",
+      "- Fact / Inference / Missing Context Separation: keep direct evidence separate from derived conclusions and uncertainty.",
+      "- Domain Selection: choose only relevant domains, each with evidence and a confidence label embedded in the reason.",
+      "- Evidence Ranking: prefer direct, current, architecture-specific evidence over weak or generic evidence.",
+      "- Constraint Application: ensure all recommendations obey architecture insights, coding rules, API conventions, and security rules when included.",
+      "",
       "# Project DNA Context Package",
       this.renderJsonBlock(compactContext),
       "",
       "# Output Contract",
       this.renderJsonBlock(this.buildOutputContract(input)),
       "",
+      "# Output Field Guidance",
+      '- selectedDomains[].reason must include "Confidence: high|medium|low" plus why the domain is relevant to this request.',
+      '- selectedDomains[].evidence must contain concise artifact-backed evidence, for example "domain-context.json: <fact>".',
+      "- relevantContext arrays must include only context that influenced the final prompt; leave unrelated categories empty.",
+      "- enrichedPrompt.warnings must include evidence conflicts, risky assumptions, and ambiguous interpretations.",
+      "- enrichedPrompt.missingContext must include facts needed for safer implementation but absent from the artifacts.",
+      "- confidence.notes must summarize evidence strength, inference strength, conflicts, and ambiguity.",
+      "",
       "# Final Prompt Requirements",
       "- enrichedPrompt.markdown must be formal English.",
       "- enrichedPrompt.markdown must include: Task, Relevant Project Context, Relevant Domains, Architecture Notes, Technologies / Dependencies, Coding Constraints, API / Structural Constraints, Expected Outcome, Missing Context.",
       "- Include Security Constraints only when securityIncluded is true and security evidence exists.",
       "- Respect minChars, maxChars, and softOverage as practical character targets for enrichedPrompt.markdown.",
-      "- The selectedDomains array must be inferred by Fireworks from the artifacts, not copied blindly.",
-      "- Every selected domain must include evidence from the supplied artifacts."
+      "- The Relevant Project Context section must distinguish confirmed facts from inference when both are used.",
+      "- The Relevant Domains section must include only selected domains and explain why each matters.",
+      "- The Architecture Notes section must prioritize architecture-insights.json over generic engineering advice.",
+      "- The Technologies / Dependencies section must mention only technologies and dependencies present in the supplied artifacts.",
+      "- The Coding Constraints and API / Structural Constraints sections must be constraints, not generic best practices.",
+      "- Do not include unsupported file names, module names, dependencies, commands, or architecture patterns."
     ].join("\n");
   }
   buildCompactContext(input) {
@@ -1312,6 +1490,20 @@ ${userPrompt}`,
     const architectureInsights = this.asObject(input.knowledgeBase.architectureInsights);
     const dependencies = this.asObject(input.knowledgeBase.dependencies);
     return {
+      artifactManifest: {
+        purpose: "Use this manifest to select relevant evidence. Do not treat every artifact as relevant.",
+        availableArtifacts: [
+          "business-context.json",
+          "domain-context.json",
+          "architecture-insights.json",
+          "scanner-report.json",
+          "dependencies.json",
+          "coding-rules.json",
+          "api-conventions.json",
+          input.includeSecurity ? "security-rules.json" : "security-rules.json omitted",
+          "decision-log.json"
+        ]
+      },
       businessContext: input.knowledgeBase.businessContext,
       domainContext: input.knowledgeBase.domainContext,
       architectureInsights: {
@@ -1319,13 +1511,17 @@ ${userPrompt}`,
         architectureStyle: architectureInsights.architectureStyle,
         businessDomains: architectureInsights.businessDomains,
         technicalDomains: architectureInsights.technicalDomains,
-        //businessIntent: architectureInsights.businessIntent,
+        businessIntent: architectureInsights.businessIntent,
+        relevantTechnologies: this.takeArray(architectureInsights.relevantTechnologies, TECHNOLOGY_LIMIT),
+        dependencyIntent: architectureInsights.dependencyIntent,
         codingConventions: architectureInsights.codingConventions,
         riskAreas: architectureInsights.riskAreas,
-        //missingContext: architectureInsights.missingContext,
-        //recommendedConstraints: architectureInsights.recommendedConstraints,
-        //importantModules: architectureInsights.importantModules,
-        //architecturalRecommendations: architectureInsights.architecturalRecommendations,
+        securityConcerns: architectureInsights.securityConcerns,
+        missingContext: architectureInsights.missingContext,
+        recommendedConstraints: architectureInsights.recommendedConstraints,
+        importantModules: this.takeArray(architectureInsights.importantModules, 16),
+        architecturalRecommendations: this.takeArray(architectureInsights.architecturalRecommendations, 12),
+        evidence: architectureInsights.evidence,
         confidence: architectureInsights.confidence
       },
       scannerFacts: {
@@ -1341,8 +1537,8 @@ ${userPrompt}`,
       },
       dependencies: {
         dependencies: this.takeArray(scannerReport.dependencies ?? dependencies.dependencies, DEPENDENCY_LIMIT),
-        //devDependencies: this.takeArray(scannerReport.devDependencies ?? dependencies.devDependencies, 16),
-        //dependencyIntent: dependencies.dependencyIntent,
+        devDependencies: this.takeArray(scannerReport.devDependencies ?? dependencies.devDependencies, 16),
+        dependencyIntent: dependencies.dependencyIntent,
         scripts: this.takeArray(scannerReport.scripts ?? dependencies.scripts, 16)
       },
       codingRules: input.knowledgeBase.codingRules,
@@ -1578,15 +1774,15 @@ var ProjectOverviewUseCase = class {
   aiService;
   promptBuilder;
   async execute(projectRoot) {
-    const absoluteRoot = path8.resolve(projectRoot);
+    const absoluteRoot = path10.resolve(projectRoot);
     await this.validationService.validateWorkspace(absoluteRoot);
-    const pdnaDir = path8.join(absoluteRoot, ".pdna");
+    const pdnaDir = path10.join(absoluteRoot, ".pdna");
     await this.ensureProjectDnaInitialized(pdnaDir);
     const contextBundle = await this.loadContextBundle(pdnaDir);
-    const overviewPath = path8.join(pdnaDir, "project-overview.md");
-    const insightsPath = path8.join(pdnaDir, "architecture-insights.json");
-    const businessContextPath = path8.join(pdnaDir, "business-context.json");
-    const domainContextPath = path8.join(pdnaDir, "domain-context.json");
+    const overviewPath = path10.join(pdnaDir, "project-overview.md");
+    const insightsPath = path10.join(pdnaDir, "architecture-insights.json");
+    const businessContextPath = path10.join(pdnaDir, "business-context.json");
+    const domainContextPath = path10.join(pdnaDir, "domain-context.json");
     const existingContent = await fs6.pathExists(overviewPath) ? await fs6.readFile(overviewPath, "utf8") : "";
     const answer = await this.promptForOverview(existingContent);
     if (answer.trim().length === 0) {
@@ -1636,7 +1832,7 @@ var ProjectOverviewUseCase = class {
       };
     } catch (error) {
       if (error instanceof AIProviderValidationError) {
-        const fallbackPath2 = path8.join(pdnaDir, "architecture-insights.failed.json");
+        const fallbackPath2 = path10.join(pdnaDir, "architecture-insights.failed.json");
         await writeJsonFile(fallbackPath2, {
           generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
           providerId: error.providerId,
@@ -1663,7 +1859,7 @@ var ProjectOverviewUseCase = class {
           providerId: providerInfo.providerId
         };
       }
-      const fallbackPath = path8.join(pdnaDir, "architecture-insights.error.json");
+      const fallbackPath = path10.join(pdnaDir, "architecture-insights.error.json");
       await writeJsonFile(fallbackPath, {
         generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
         providerId: providerInfo.providerId,
@@ -1699,7 +1895,7 @@ var ProjectOverviewUseCase = class {
     }
     const missingFiles = [];
     for (const fileName of REQUIRED_PROJECT_DNA_FILES) {
-      if (!await fs6.pathExists(path8.join(pdnaDir, fileName))) {
+      if (!await fs6.pathExists(path10.join(pdnaDir, fileName))) {
         missingFiles.push(fileName);
       }
     }
@@ -1727,7 +1923,7 @@ var ProjectOverviewUseCase = class {
   }
   async readRequiredJson(pdnaDir, fileName) {
     try {
-      const value = await fs6.readJson(path8.join(pdnaDir, fileName));
+      const value = await fs6.readJson(path10.join(pdnaDir, fileName));
       if (value && typeof value === "object" && !Array.isArray(value)) {
         return value;
       }
@@ -1798,11 +1994,11 @@ var ProjectOverviewUseCase = class {
     }));
   }
   async writeMarkdownLog(pdnaDir, input) {
-    const logsDir = path8.join(pdnaDir, "logs", "project-overview");
+    const logsDir = path10.join(pdnaDir, "logs", "project-overview");
     await fs6.ensureDir(logsDir);
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
     const fileName = `${timestamp.replace(/[:.]/g, "-")}.md`;
-    const logPath = path8.join(logsDir, fileName);
+    const logPath = path10.join(logsDir, fileName);
     const failureSection = input.failureDetails?.length ? ["## Failure Details", ...input.failureDetails.map((detail) => `- ${detail}`), ""].join("\n") : "";
     const markdown = [
       "# Project Overview Intelligence Run",
@@ -1856,23 +2052,23 @@ var ProjectOverviewUseCase = class {
 
 // src/application/prompt.use-case.ts
 import fs8 from "fs-extra";
-import path10 from "path";
+import path12 from "path";
 import readline2 from "readline/promises";
 
 // src/prompt/prompt-persistence.service.ts
 import fs7 from "fs-extra";
-import path9 from "path";
+import path11 from "path";
 var PromptPersistenceService = class {
   async save(pdnaDir, result, promptPackage, size) {
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
     const fileStamp = timestamp.replace(/[:.]/g, "-");
-    const promptsDir = path9.join(pdnaDir, "prompts");
-    const logsDir = path9.join(pdnaDir, "logs", "prompt");
+    const promptsDir = path11.join(pdnaDir, "prompts");
+    const logsDir = path11.join(pdnaDir, "logs", "prompt");
     await fs7.ensureDir(promptsDir);
     await fs7.ensureDir(logsDir);
-    const promptPath = path9.join(promptsDir, `${fileStamp}-${result.source.mode}.md`);
-    const jsonPath = path9.join(promptsDir, `${fileStamp}-${result.source.mode}.json`);
-    const logPath = path9.join(logsDir, `${fileStamp}-${result.source.mode}.md`);
+    const promptPath = path11.join(promptsDir, `${fileStamp}-${result.source.mode}.md`);
+    const jsonPath = path11.join(promptsDir, `${fileStamp}-${result.source.mode}.json`);
+    const logPath = path11.join(logsDir, `${fileStamp}-${result.source.mode}.md`);
     await fs7.writeFile(promptPath, result.enrichedPrompt.markdown, "utf8");
     await fs7.writeJson(jsonPath, result, { spaces: 2 });
     await fs7.writeFile(logPath, this.renderLog(timestamp, result, promptPath, jsonPath, promptPackage, size), "utf8");
@@ -1881,12 +2077,12 @@ var PromptPersistenceService = class {
   async saveFailure(pdnaDir, input) {
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
     const fileStamp = timestamp.replace(/[:.]/g, "-");
-    const promptsDir = path9.join(pdnaDir, "prompts");
-    const logsDir = path9.join(pdnaDir, "logs", "prompt");
+    const promptsDir = path11.join(pdnaDir, "prompts");
+    const logsDir = path11.join(pdnaDir, "logs", "prompt");
     await fs7.ensureDir(promptsDir);
     await fs7.ensureDir(logsDir);
-    const fallbackPath = path9.join(promptsDir, `${fileStamp}-${input.mode}.failed.json`);
-    const logPath = path9.join(logsDir, `${fileStamp}-${input.mode}.failed.md`);
+    const fallbackPath = path11.join(promptsDir, `${fileStamp}-${input.mode}.failed.json`);
+    const logPath = path11.join(logsDir, `${fileStamp}-${input.mode}.failed.md`);
     await fs7.writeJson(fallbackPath, {
       generatedAt: timestamp,
       providerId: input.providerId,
@@ -1987,9 +2183,9 @@ var PromptUseCase = class {
   promptBuilder;
   persistenceService;
   async execute(projectRoot, options = {}) {
-    const absoluteRoot = path10.resolve(projectRoot);
+    const absoluteRoot = path12.resolve(projectRoot);
     await this.validationService.validateWorkspace(absoluteRoot);
-    const pdnaDir = path10.join(absoluteRoot, ".pdna");
+    const pdnaDir = path12.join(absoluteRoot, ".pdna");
     await this.ensureProjectDnaInitialized(pdnaDir, Boolean(options.includeSecurity));
     const request = await this.resolveRequest(options.request);
     if (request.trim().length === 0) {
@@ -2080,11 +2276,11 @@ var PromptUseCase = class {
     }
     const missingFiles = [];
     for (const fileName of REQUIRED_PROMPT_FILES) {
-      if (!await fs8.pathExists(path10.join(pdnaDir, fileName))) {
+      if (!await fs8.pathExists(path12.join(pdnaDir, fileName))) {
         missingFiles.push(fileName);
       }
     }
-    if (includeSecurity && !await fs8.pathExists(path10.join(pdnaDir, "security-rules.json"))) {
+    if (includeSecurity && !await fs8.pathExists(path12.join(pdnaDir, "security-rules.json"))) {
       missingFiles.push("security-rules.json");
     }
     if (missingFiles.length > 0) {
@@ -2108,7 +2304,7 @@ var PromptUseCase = class {
   }
   async readRequiredJson(pdnaDir, fileName) {
     try {
-      const value = await fs8.readJson(path10.join(pdnaDir, fileName));
+      const value = await fs8.readJson(path12.join(pdnaDir, fileName));
       if (value && typeof value === "object" && !Array.isArray(value)) {
         return value;
       }
@@ -2158,11 +2354,10 @@ var ProjectDnaService = class {
   }
   async validate(projectRoot) {
     this.logger.info(`Validating Project DNA state in ${projectRoot}`);
-    const result = this.validateOutputUseCase.execute();
+    const result = await this.validateOutputUseCase.execute(projectRoot);
     return result.summary;
   }
   async projectOverview(projectRoot) {
-    debugger;
     this.logger.info(`Collecting project overview for ${projectRoot}`);
     const result = await this.projectOverviewUseCase.execute(projectRoot);
     if (result.status === "skipped") {
@@ -2219,7 +2414,6 @@ function parseIntegerOption(value) {
   return Number.parseInt(value, 10);
 }
 function createProgram() {
-  debugger;
   const program2 = new Command();
   const logger = new Logger();
   program2.name("pdna").description("Project DNA CLI foundation for architecture governance").version("0.1.0");

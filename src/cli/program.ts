@@ -15,7 +15,7 @@ function parseIntegerOption(value: string): number {
 }
 
 export function createProgram(): Command {
-  debugger
+
   const program = new Command();
   const logger = new Logger();
 

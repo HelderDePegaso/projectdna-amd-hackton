@@ -29,12 +29,12 @@ export class ProjectDnaService {
 
   public async validate(projectRoot: string): Promise<string> {
     this.logger.info(`Validating Project DNA state in ${projectRoot}`);
-    const result = this.validateOutputUseCase.execute();
+    const result = await this.validateOutputUseCase.execute(projectRoot);
     return result.summary;
   }
 
   public async projectOverview(projectRoot: string): Promise<string> {
-    debugger
+
     this.logger.info(`Collecting project overview for ${projectRoot}`);
     const result = await this.projectOverviewUseCase.execute(projectRoot);
 

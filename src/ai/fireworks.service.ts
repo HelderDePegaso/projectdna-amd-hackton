@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { AIProviderCapabilities, AIProviderPDNA, AIProviderStatus, StructuredAnalysisRequest } from './ai-provider-pdna.js';
 import { AIProviderExecutionError } from './ai-provider-pdna.js';
+import { EnvironmentService } from './environment.service.js';
 
 type FireworksChatClient = {
   chat: {
@@ -19,12 +20,13 @@ export interface FireworksServiceOptions {
   apiKey?: string;
   baseURL?: string;
   model?: string;
+  temperature?: number;
+  timeoutMs?: number;
   projectDnaVersion?: string;
   client?: FireworksChatClient;
+  environment?: EnvironmentService;
 }
 
-const DEFAULT_FIREWORKS_BASE_URL = 'https://api.fireworks.ai/inference/v1';
-const DEFAULT_FIREWORKS_MODEL = 'accounts/fireworks/models/llama-v3p1-70b-instruct';
 const DEFAULT_PROJECT_DNA_VERSION = '0.1.0';
 
 export class FireworksService implements AIProviderPDNA {
@@ -34,13 +36,18 @@ export class FireworksService implements AIProviderPDNA {
   private readonly apiKey?: string;
   private readonly baseURL: string;
   private readonly model: string;
+  private readonly temperature: number;
+  private readonly timeoutMs: number;
   private readonly projectDnaVersion: string;
   private readonly providedClient?: FireworksChatClient;
 
   constructor(options: FireworksServiceOptions = {}) {
-    this.apiKey = options.apiKey ?? process.env.FIREWORKS_API_KEY;
-    this.baseURL = options.baseURL ?? process.env.FIREWORKS_BASE_URL ?? DEFAULT_FIREWORKS_BASE_URL;
-    this.model = options.model ?? process.env.FIREWORKS_MODEL ?? DEFAULT_FIREWORKS_MODEL;
+    const environment = options.environment ?? new EnvironmentService();
+    this.apiKey = options.apiKey ?? environment.getOptionalFireworksApiKey();
+    this.baseURL = options.baseURL ?? environment.getBaseUrl();
+    this.model = options.model ?? environment.getModel();
+    this.temperature = options.temperature ?? environment.getTemperature();
+    this.timeoutMs = options.timeoutMs ?? environment.getTimeout();
     this.projectDnaVersion = options.projectDnaVersion ?? DEFAULT_PROJECT_DNA_VERSION;
     this.providedClient = options.client;
   }
@@ -49,15 +56,15 @@ export class FireworksService implements AIProviderPDNA {
     if (!this.apiKey && !this.providedClient) {
       return {
         available: false,
-        message: 'Missing FIREWORKS_API_KEY environment variable.',
-        metadata: { model: this.model, baseURL: this.baseURL },
+        message: 'Missing PDNA_FIREWORKS_API_KEY or FIREWORKS_API_KEY environment variable.',
+        metadata: this.getConfigurationMetadata(),
       };
     }
 
     return {
       available: true,
       message: 'Fireworks provider is configured.',
-      metadata: { model: this.model, baseURL: this.baseURL },
+      metadata: this.getConfigurationMetadata(),
     };
   }
 
@@ -69,6 +76,8 @@ export class FireworksService implements AIProviderPDNA {
       metadata: {
         model: this.model,
         responseFormat: 'json_object',
+        temperature: this.temperature,
+        timeoutMs: this.timeoutMs,
       },
     };
   }
@@ -82,7 +91,7 @@ export class FireworksService implements AIProviderPDNA {
     try {
       const response = await this.getClient().chat.completions.create({
         model: this.model,
-        temperature: 0.2,
+        temperature: this.temperature,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: this.buildProviderSystemPrompt(request) },
@@ -101,7 +110,8 @@ export class FireworksService implements AIProviderPDNA {
         throw error;
       }
 
-      throw new AIProviderExecutionError(this.providerId, `Fireworks failed to execute ${request.mode ?? 'structured'} analysis.`, error);
+      const details = this.describeProviderError(error);
+      throw new AIProviderExecutionError(this.providerId, `Fireworks failed to execute ${request.mode ?? 'structured'} analysis.${details}`, error);
     }
   }
 
@@ -113,7 +123,26 @@ export class FireworksService implements AIProviderPDNA {
     return new OpenAI({
       apiKey: this.apiKey,
       baseURL: this.baseURL,
+      timeout: this.timeoutMs,
     }) as unknown as FireworksChatClient;
+  }
+
+  private getConfigurationMetadata(): Record<string, string | number> {
+    return {
+      model: this.model,
+      baseURL: this.baseURL,
+      temperature: this.temperature,
+      timeoutMs: this.timeoutMs,
+    };
+  }
+
+  private describeProviderError(error: unknown): string {
+    if (!(error instanceof Error)) {
+      return '';
+    }
+
+    const cause = error.cause instanceof Error ? ` Cause: ${error.cause.message}` : '';
+    return ` ${error.name}: ${error.message}.${cause}`;
   }
 
   private buildSystemPrompt(): string {

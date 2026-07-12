@@ -9,14 +9,8 @@ export class ProjectContextResolver {
       frameworks: scanResult.detectedFrameworks,
       dependencies: [...scanResult.dependencies, ...scanResult.devDependencies],
       sourceDirectories: scanResult.sourceDirectories,
-      architectureSummary: this.buildArchitectureSummary(scanResult),
+      architectureSummary: '',
       generatedAt: new Date().toISOString(),
     };
-  }
-
-  // TODO () : Fazer isso com IA
-  private buildArchitectureSummary(scanResult: ProjectScanResult): string {
-    const layers = ['cli', 'application', 'domain', 'infrastructure'];
-    return `Detected ${scanResult.technologies.length > 0 ? scanResult.technologies.join(', ') : 'general'} stack with ${scanResult.sourceDirectories.length > 0 ? scanResult.sourceDirectories.join(', ') : 'standard'} source structure.`;
   }
 }

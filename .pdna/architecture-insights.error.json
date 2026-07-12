@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-11T19:56:44.299Z",
+  "generatedAt": "2026-07-12T19:43:42.374Z",
   "providerId": "fireworks",
-  "error": "Fireworks failed to execute project overview analysis."
+  "error": "Fireworks failed to execute overview-analysis analysis. Error: 401 The API key you provided is invalid.."
 }

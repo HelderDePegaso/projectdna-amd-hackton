@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-07-11T13:12:41.594Z",
+  "generatedAt": "2026-07-12T10:44:59.902Z",
   "generator": {
     "provider": "fireworks",
     "model": "accounts/fireworks/models/glm-5p2",
@@ -8,34 +8,45 @@
   },
   "source": {
     "overviewProvided": true,
-    "scannerReportVersion": "0.1.0"
+    "scannerReportVersion": "0.1.0",
+    "architectureVersion": ""
   },
-  "summary": "Project DNA is an AI-powered CLI tool that creates a persistent, local-first architectural knowledge layer for software projects, bridging the gap between business intent and technical reality to reduce AI hallucinations and technical debt.",
+  "summary": "Project DNA is an AI-powered CLI tool that preserves software project architectural and business knowledge in a local, structured format to enable context-aware AI coding assistants and reduce hallucinations.",
   "project": {
     "name": "projectdna",
-    "language": "typescript",
+    "language": "TypeScript",
     "packageManager": "npm",
     "framework": {
-      "name": "react",
-      "confidence": 0.5,
+      "name": "Node.js CLI",
+      "version": "",
+      "confidence": 0.9,
       "evidence": [
-        "React-oriented dependency or source convention detected"
+        "Dependencies include commander, chalk, ora",
+        "Overview states it operates as a CLI application"
       ]
     }
   },
   "architectureStyle": {
-    "primary": "Command-Line Interface (CLI)",
+    "primary": "Modular Monolith",
     "secondary": [
-      "Local-First Architecture",
+      "CLI",
+      "Local-First",
       "Provider Abstraction"
     ],
-    "reasoning": "The system operates as a CLI tool executed inside software projects, storing knowledge locally in a `.pdna` directory and abstracting the AI provider layer."
+    "reasoning": "Operates as a local CLI tool with a modular structure separating scanning, AI reasoning, and local persistence. Designed to be provider-agnostic for AI reasoning."
   },
   "projectStructure": {
     "layers": [
       {
-        "name": "Source",
-        "description": "Core application logic",
+        "name": "CLI Interface",
+        "description": "Handles command parsing, user interaction, and terminal UI",
+        "folders": [
+          "src"
+        ]
+      },
+      {
+        "name": "Core Logic",
+        "description": "Scanning, AI reasoning orchestration, and local persistence",
         "folders": [
           "src"
         ]
@@ -43,52 +54,48 @@
     ],
     "modules": [
       {
-        "name": "CLI Commands",
-        "responsibility": "Handle user input and execute commands like init and overview",
-        "dependencies": [
-          "commander"
-        ]
-      },
-      {
         "name": "Scanner",
-        "responsibility": "Analyze repository structure and technical signals",
+        "responsibility": "Analyzes repository structure, dependencies, and configuration",
         "dependencies": [
           "fs-extra",
           "execa"
         ]
       },
       {
-        "name": "AI Reasoning",
-        "responsibility": "Interface with LLM providers to analyze and structure knowledge",
+        "name": "AI Engine",
+        "responsibility": "Interfaces with LLM providers to reason about architecture",
         "dependencies": [
-          "openai"
+          "openai",
+          "zod"
         ]
       },
       {
         "name": "Persistence",
-        "responsibility": "Store and manage the `.pdna` knowledge base locally",
+        "responsibility": "Stores knowledge in .pdna directory",
         "dependencies": [
           "fs-extra"
         ]
       },
       {
-        "name": "Validation",
-        "responsibility": "Validate AI output against predefined schemas",
+        "name": "CLI",
+        "responsibility": "Command execution and terminal UI",
         "dependencies": [
-          "zod"
+          "commander",
+          "chalk",
+          "ora"
         ]
       }
     ],
     "boundaries": [
       {
-        "from": "CLI Commands",
-        "to": "Scanner",
-        "rule": "Commands trigger scanning operations"
+        "from": "CLI",
+        "to": "Core Logic",
+        "rule": "CLI commands trigger core logic workflows"
       },
       {
-        "from": "AI Reasoning",
+        "from": "AI Engine",
         "to": "Persistence",
-        "rule": "Validated AI output is saved locally"
+        "rule": "Validated AI output is persisted locally"
       }
     ],
     "importantFolders": [
@@ -103,50 +110,46 @@
   "businessDomains": [
     {
       "name": "Architectural Governance",
-      "description": "Preserving and managing architectural context and decisions throughout the software lifecycle."
+      "description": "Capturing and preserving architectural decisions, context, and engineering standards."
     },
     {
       "name": "Knowledge Management",
-      "description": "Capturing, structuring, and persisting technical and business project knowledge."
+      "description": "Storing and organizing project technical and business knowledge in a structured format."
     },
     {
-      "name": "AI Context Provisioning",
-      "description": "Providing structured architectural intelligence to AI coding assistants to improve code generation."
+      "name": "AI Reasoning",
+      "description": "Analyzing project data to infer architectural insights, business intent, and domain context."
     }
   ],
   "technicalDomains": [
     {
       "name": "CLI",
-      "description": "Command-line interface for user interaction and project initialization."
+      "description": "Command-line interface for user interaction and command execution."
     },
     {
-      "name": "Repository Scanning",
-      "description": "Automated analysis of project structure, dependencies, and configurations."
+      "name": "File System",
+      "description": "Local-first storage and repository scanning."
     },
     {
       "name": "AI Integration",
-      "description": "Abstraction layer for LLM providers to perform reasoning and knowledge extraction."
+      "description": "Provider abstraction for LLM reasoning and prompt execution."
     },
     {
-      "name": "Schema Validation",
-      "description": "Ensuring structured output consistency using schemas."
-    },
-    {
-      "name": "Local Storage",
-      "description": "File-based persistence of knowledge in the `.pdna` directory."
+      "name": "Validation",
+      "description": "Schema validation for structured AI output using Zod."
     }
   ],
   "relevantTechnologies": [
     {
-      "name": "typescript",
+      "name": "TypeScript",
       "category": "language"
     },
     {
-      "name": "commander",
-      "category": "library"
+      "name": "Node.js",
+      "category": "runtime"
     },
     {
-      "name": "zod",
+      "name": "commander",
       "category": "library"
     },
     {
@@ -154,11 +157,11 @@
       "category": "library"
     },
     {
-      "name": "fs-extra",
+      "name": "zod",
       "category": "library"
     },
     {
-      "name": "execa",
+      "name": "fs-extra",
       "category": "library"
     },
     {
@@ -167,6 +170,10 @@
     },
     {
       "name": "ora",
+      "category": "library"
+    },
+    {
+      "name": "execa",
       "category": "library"
     },
     {
@@ -185,142 +192,136 @@
   "dependencyIntent": {
     "approved": [
       "commander",
-      "zod",
       "openai",
+      "zod",
       "fs-extra",
-      "execa",
       "chalk",
       "ora",
-      "dotenv"
+      "dotenv",
+      "execa"
     ],
     "discouraged": [],
     "forbidden": [],
-    "reasoning": "Dependencies support CLI operations, schema validation, AI provider interaction, and local file system management."
+    "reasoning": "Dependencies directly support CLI operations, AI provider integration, schema validation, and file system manipulation."
   },
   "businessIntent": {
-    "overview": "Project DNA is an AI-powered architectural governance platform that preserves technical and business knowledge of software projects. It acts as a persistent knowledge layer to help AI coding assistants understand project architecture, reducing hallucinations and technical debt.",
+    "overview": "Project DNA is an AI-powered architectural governance platform that preserves the technical and business knowledge of software projects. It operates as a CLI tool that scans repositories and uses AI to generate a persistent, local knowledge base, enabling AI coding assistants to understand the project deeply.",
     "targetUsers": [
       "Software Developers",
       "Engineering Teams",
       "AI Coding Assistants"
     ],
     "goals": [
-      "Preserve architectural DNA across project lifecycle",
-      "Reduce AI hallucinations and architectural inconsistencies",
-      "Provide reliable architectural knowledge for AI agents",
-      "Maintain long-term software quality",
-      "Bridge the gap between business intent and technical reality"
+      "Preserve architectural context and business intent.",
+      "Reduce AI hallucinations and architectural inconsistencies.",
+      "Provide a persistent knowledge layer for AI interactions.",
+      "Maintain a local-first, version-controllable architectural memory."
     ],
-    "coreValue": "Creating a continuously evolving architectural memory that enables AI assistants to generate context-aware and architecturally consistent solutions."
+    "coreValue": "Serving as the architectural memory of software projects, enabling AI assistants to generate accurate, context-aware, and architecturally consistent solutions."
   },
   "codingConventions": {
     "patterns": [
-      "Prefer TypeScript for new implementation work",
-      "Keep architecture knowledge centralized in .pdna files"
+      "Prefer TypeScript for new implementation work."
     ],
     "naming": [],
     "style": [],
     "architectureRules": [
-      "Provider abstraction: AI layer is decoupled from specific LLM providers",
-      "Local-first architecture: Knowledge stored inside the project, not external databases"
+      "Keep architecture knowledge centralized in .pdna files.",
+      "AI layer must be decoupled from specific LLM providers.",
+      "AI must not generate source code, only architectural knowledge."
     ]
   },
   "securityConcerns": [
     {
       "title": "Secret Management",
       "description": "Avoid storing secrets in source files.",
-      "severity": "medium"
+      "severity": "high"
     },
     {
-      "title": "Sensitive Project Context",
+      "title": "Sensitive Context Exposure",
       "description": "Treat architecture knowledge as sensitive project context.",
-      "severity": "low"
+      "severity": "medium"
     }
   ],
   "riskAreas": [
     {
-      "area": "Provider Dependency",
-      "reason": "While abstracted, the system currently relies on Fireworks AI for reasoning.",
+      "area": "AI Provider Dependency",
+      "reason": "While provider abstraction is planned, current implementation relies on specific provider SDKs.",
       "impact": "medium"
     },
     {
       "area": "Scanner Accuracy",
-      "reason": "False positives in framework detection (e.g., React detected for a CLI tool).",
+      "reason": "Scanner detected React, but dependencies indicate a Node.js CLI tool.",
       "impact": "low"
     }
   ],
   "missingContext": [
     {
-      "topic": "Database",
-      "reason": "No database technology detected or mentioned; relies on local file system."
+      "topic": "Internal Source Structure",
+      "reason": "Scanner only provides 'src' as a source directory without detailed file breakdown."
     },
     {
-      "topic": "Authentication",
-      "reason": "No authentication mechanism mentioned for the CLI tool itself."
-    },
-    {
-      "topic": "Deployment Platform",
-      "reason": "Distribution method for the CLI (e.g., npm registry) not explicitly detailed."
+      "topic": "Specific LLM Prompts",
+      "reason": "Overview mentions AI reasoning but does not detail the prompt engineering strategies."
     }
   ],
   "recommendedConstraints": [
-    "Maintain provider abstraction to allow easy integration of new LLM providers",
-    "Ensure all AI-generated output is validated against predefined schemas before persistence",
-    "Keep all knowledge storage local to the project repository"
+    "Must not generate code, only architectural intelligence.",
+    "Must store all generated knowledge locally inside the project.",
+    "Must validate all AI outputs against predefined schemas before persistence."
   ],
   "importantModules": [
     {
-      "name": "CLI Commands",
-      "reason": "Entry point for users to initialize and manage project knowledge"
-    },
-    {
-      "name": "AI Reasoning",
-      "reason": "Core intelligence engine that transforms raw data into structured knowledge"
-    },
-    {
       "name": "Scanner",
-      "reason": "Gathers technical reality from the repository"
+      "reason": "Extracts technical reality from the repository."
+    },
+    {
+      "name": "AI Engine",
+      "reason": "Transforms raw data and business overview into structured intelligence."
+    },
+    {
+      "name": "Persistence",
+      "reason": "Ensures knowledge is stored locally for future AI consumption."
     }
   ],
-  "reasoningSummary": "Project DNA is a TypeScript CLI tool designed to capture and structure software project architecture. It merges scanner-based technical facts with human-provided business overviews, using an AI reasoning engine to generate a persistent, local-first knowledge base. The architecture emphasizes provider abstraction and schema validation to ensure reliable context for future AI coding assistants.",
+  "reasoningSummary": "Merged scanner facts (TypeScript, CLI dependencies) with the human overview (AI governance, local-first architecture) to deduce a modular CLI architecture. Identified a discrepancy where the scanner detected React, but evidence strongly points to a Node.js CLI tool.",
   "architecturalRecommendations": [
     {
       "priority": "high",
-      "title": "Implement Provider Interface",
-      "description": "Formalize the LLM provider abstraction layer to ensure Fireworks AI, OpenAI, and others can be swapped seamlessly.",
-      "rationale": "Overview explicitly states provider abstraction is a core principle."
+      "title": "Enforce Provider Abstraction",
+      "description": "Ensure all LLM interactions go through a generic provider interface.",
+      "rationale": "Overview explicitly states the need to support multiple providers without affecting the core application."
     },
     {
-      "priority": "medium",
-      "title": "Schema Versioning",
-      "description": "Implement versioning for the `.pdna` knowledge base schemas.",
-      "rationale": "Overview mentions future project versioning and compatibility across future versions."
+      "priority": "high",
+      "title": "Strict Schema Validation",
+      "description": "Validate all AI outputs using Zod before writing to the .pdna directory.",
+      "rationale": "Guarantees consistency, predictability, and compatibility across future versions."
     }
   ],
   "confidence": {
     "score": 0.85,
     "notes": [
-      "High confidence in business intent and core architecture based on detailed overview",
-      "Scanner facts align with CLI tool nature despite React false positive",
-      "Technical implementation details are well-defined"
+      "Scanner detected React with medium confidence, but dependencies and overview strongly indicate a Node.js CLI tool.",
+      "Overview provides clear business and architectural intent, reducing uncertainty in domain mapping."
     ]
   },
   "evidence": {
     "scannerSignals": [
       "TypeScript detected via package.json",
-      "Dependencies include commander, zod, openai, fs-extra",
-      "Source directory is src"
+      "Dependencies include commander, chalk, ora, openai, zod",
+      "Source directory is 'src'"
     ],
     "overviewSignals": [
-      "CLI application with pdna init and pdna project overview commands",
-      "Local-first architecture storing in .pdna directory",
-      "Provider abstraction with Fireworks AI as current engine",
-      "Categories: Business Context, Domain Context, Architecture Insights"
+      "Operates as a CLI application",
+      "Uses Fireworks AI for reasoning",
+      "Local-first architecture storing data in .pdna directory",
+      "Provider abstraction is a core principle"
     ],
     "derivedSignals": [
-      "CLI architecture style inferred from commander dependency and overview",
-      "Schema validation inferred from zod dependency and overview mention",
-      "AI integration inferred from openai dependency and Fireworks AI mention"
+      "Architecture is a modular monolith CLI tool",
+      "Zod is used for schema validation of AI outputs",
+      "fs-extra and execa are used for repository scanning"
     ]
   }
 }

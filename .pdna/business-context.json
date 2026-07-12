@@ -1,17 +1,16 @@
 {
   "projectName": "projectdna",
-  "summary": "Project DNA is an AI-powered architectural governance platform that preserves technical and business knowledge of software projects. It acts as a persistent knowledge layer to help AI coding assistants understand project architecture, reducing hallucinations and technical debt.",
+  "summary": "Project DNA is an AI-powered architectural governance platform that preserves the technical and business knowledge of software projects. It operates as a CLI tool that scans repositories and uses AI to generate a persistent, local knowledge base, enabling AI coding assistants to understand the project deeply.",
   "goals": [
-    "Preserve architectural DNA across project lifecycle",
-    "Reduce AI hallucinations and architectural inconsistencies",
-    "Provide reliable architectural knowledge for AI agents",
-    "Maintain long-term software quality",
-    "Bridge the gap between business intent and technical reality"
+    "Preserve architectural context and business intent.",
+    "Reduce AI hallucinations and architectural inconsistencies.",
+    "Provide a persistent knowledge layer for AI interactions.",
+    "Maintain a local-first, version-controllable architectural memory."
   ],
   "domains": [
     "Architectural Governance",
     "Knowledge Management",
-    "AI Context Provisioning"
+    "AI Reasoning"
   ],
-  "generatedAt": "2026-07-11T13:12:41.594Z"
+  "generatedAt": "2026-07-12T10:44:59.902Z"
 }

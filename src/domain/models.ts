@@ -1,7 +1,7 @@
 export interface FrameworkDetection {
-  name: string;
-  confidence: 'high' | 'medium' | 'low';
-  evidence: string[];
+  name?: string;
+  confidence?: 'high' | 'medium' | 'low';
+  evidence?: string[];
   version?: string;
 }
 

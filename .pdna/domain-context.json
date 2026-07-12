@@ -3,45 +3,40 @@
   "domains": [
     "Architectural Governance",
     "Knowledge Management",
-    "AI Context Provisioning",
+    "AI Reasoning",
     "CLI",
-    "Repository Scanning",
+    "File System",
     "AI Integration",
-    "Schema Validation",
-    "Local Storage"
+    "Validation"
   ],
   "concepts": [
     {
       "name": "Architectural Governance",
-      "description": "Preserving and managing architectural context and decisions throughout the software lifecycle."
+      "description": "Capturing and preserving architectural decisions, context, and engineering standards."
     },
     {
       "name": "Knowledge Management",
-      "description": "Capturing, structuring, and persisting technical and business project knowledge."
+      "description": "Storing and organizing project technical and business knowledge in a structured format."
     },
     {
-      "name": "AI Context Provisioning",
-      "description": "Providing structured architectural intelligence to AI coding assistants to improve code generation."
+      "name": "AI Reasoning",
+      "description": "Analyzing project data to infer architectural insights, business intent, and domain context."
     },
     {
       "name": "CLI",
-      "description": "Command-line interface for user interaction and project initialization."
+      "description": "Command-line interface for user interaction and command execution."
     },
     {
-      "name": "Repository Scanning",
-      "description": "Automated analysis of project structure, dependencies, and configurations."
+      "name": "File System",
+      "description": "Local-first storage and repository scanning."
     },
     {
       "name": "AI Integration",
-      "description": "Abstraction layer for LLM providers to perform reasoning and knowledge extraction."
+      "description": "Provider abstraction for LLM reasoning and prompt execution."
     },
     {
-      "name": "Schema Validation",
-      "description": "Ensuring structured output consistency using schemas."
-    },
-    {
-      "name": "Local Storage",
-      "description": "File-based persistence of knowledge in the `.pdna` directory."
+      "name": "Validation",
+      "description": "Schema validation for structured AI output using Zod."
     }
   ],
   "modules": [
@@ -50,5 +45,5 @@
       "path": "src"
     }
   ],
-  "generatedAt": "2026-07-11T13:12:41.594Z"
+  "generatedAt": "2026-07-12T10:44:59.902Z"
 }

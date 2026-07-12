@@ -14,13 +14,13 @@ export class MemoryService {
       projectName: path.basename(projectRoot),
       projectRoot,
       architecture: {
-        summary: 'Architecture metadata placeholder for future governance workflows.',
-        layers: ['cli', 'core', 'memory', 'context', 'providers', 'validators'],
+        summary: '',
+        layers: [],
       },
-      dependencies: ['commander', 'zod', 'fs-extra'],
+      dependencies: [],
       businessContext: {
-        domain: 'Architecture governance',
-        goals: ['Preserve architectural context', 'Support future AI integrations'],
+        domain: '',
+        goals: [],
       },
       generatedAt: new Date().toISOString(),
     };

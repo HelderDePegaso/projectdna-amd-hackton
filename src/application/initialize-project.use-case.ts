@@ -14,7 +14,7 @@ export class InitializeProjectUseCase {
   constructor(
     private readonly scanner: ProjectScanner = new ProjectScanner(),
     private readonly resolver: ProjectContextResolver = new ProjectContextResolver(),
-    private readonly memoryRepository: MemoryRepository = new FileMemoryRepository('.pdna'),
+    private readonly memoryRepository?: MemoryRepository,
     private readonly configurationService: ConfigurationService = new EnvironmentConfigurationService(),
     private readonly validationService: ProjectValidationService = new ProjectValidationService(),
     private readonly dnaBuilder: ProjectDnaBuilder = new ProjectDnaBuilder(),
@@ -23,9 +23,9 @@ export class InitializeProjectUseCase {
 
   public async execute(projectRoot: string): Promise<ProjectDnaFiles> {
     const absoluteRoot = path.resolve(projectRoot);
-    const memoryDirectory = this.configurationService.get<string>('memoryDirectory', '.project-dna');
+    const memoryDirectory = this.configurationService.get<string>('memoryDirectory', '.pdna');
 
-    await this.validationService.validateWorkspace(absoluteRoot);
+    await this.validationService.validateProjectDnaCanBeInitialized(absoluteRoot);
 
     const scanResult = await this.scanner.scan(absoluteRoot);
     const context = this.resolver.resolve(scanResult);
@@ -37,18 +37,22 @@ export class InitializeProjectUseCase {
       projectRoot: context.projectRoot,
       architecture: {
         summary: context.architectureSummary,
-        layers: [/*'cli', 'application', 'domain', 'infrastructure'*/],
+        layers: [],
       },
       dependencies: context.dependencies,
       businessContext: {
-        domain: '', //  Architecture governance',
-        goals: [/*'Preserve architectural context', 'Support future AI integrations'*/],
+        domain: '',
+        goals: [],
       },
       generatedAt: context.generatedAt,
       scan: scanResult,
     };
 
-    await this.memoryRepository.saveSnapshot(snapshot);
+    const snapshotDirectory = path.isAbsolute(memoryDirectory)
+      ? memoryDirectory
+      : path.join(absoluteRoot, memoryDirectory);
+    const memoryRepository = this.memoryRepository ?? new FileMemoryRepository(snapshotDirectory);
+    await memoryRepository.saveSnapshot(snapshot);
 
     this.logger.success(`Initialized Project DNA using ${memoryDirectory}`);
     return files;

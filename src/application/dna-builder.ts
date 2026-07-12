@@ -11,22 +11,18 @@ export class ProjectDnaBuilder {
     const architecture = {
       projectName: context.projectName,
       projectRoot: absoluteRoot,
-      architectureStyle: this.inferArchitectureStyle(scanResult),
-      layers: ['presentation', 'application', 'domain', 'infrastructure'],
-      frameworkDetection: scanResult.frameworkDetection,
+      architectureStyle: '',
+      layers: [],
+      frameworkDetection: scanResult.frameworkDetection.name ? scanResult.frameworkDetection : {},
       technologyDetection: scanResult.technologyDetection,
-      rules: [
-        'Preserve architectural intent over implementation convenience.',
-        'Keep architectural knowledge in .pdna files.',
-        'Avoid code generation during architecture governance.',
-      ],
-      summary: context.architectureSummary,
+      rules: [],
+      summary: '',
       generatedAt: context.generatedAt,
     };
 
     const dependencies = {
       projectName: context.projectName,
-      dependencyIntent: this.inferDependencyIntent(scanResult),
+      dependencyIntent: [],
       dependencies: scanResult.dependencies,
       devDependencies: scanResult.devDependencies,
       scripts: scanResult.scripts,
@@ -35,8 +31,8 @@ export class ProjectDnaBuilder {
 
     const businessContext = {
       projectName: context.projectName,
-      summary: 'Project DNA captures architectural intent and product context for future AI assistance.',
-      goals: ['Preserve architectural DNA', 'Prevent architectural hallucinations', 'Support future AI coding assistants'],
+      summary: '',
+      goals: [],
       domains: [],
       generatedAt: context.generatedAt,
     };
@@ -45,19 +41,19 @@ export class ProjectDnaBuilder {
       projectName: context.projectName,
       domains: [],
       concepts: [],
-      modules: scanResult.sourceDirectories.map((directory) => ({ name: directory, path: directory })),
+      modules: [],
       generatedAt: context.generatedAt,
     };
 
     const codingRules = {
       projectName: context.projectName,
-      conventions: ['Prefer TypeScript for new implementation work.', 'Keep architecture knowledge centralized in .pdna files.'],
+      conventions: [],
       generatedAt: context.generatedAt,
     };
 
     const securityRules = {
       projectName: context.projectName,
-      concerns: ['Avoid storing secrets in source files.', 'Treat architecture knowledge as sensitive project context.'],
+      concerns: [],
       rules: [],
       generatedAt: context.generatedAt,
     };
@@ -70,34 +66,27 @@ export class ProjectDnaBuilder {
 
     const decisionLog = {
       projectName: context.projectName,
-      decisions: [
-        {
-          id: 'initial-architecture-governance',
-          title: 'Project DNA stores architecture context rather than generating code.',
-          rationale: 'The MVP must preserve architectural DNA and prepare future AI assistance.',
-          createdAt: context.generatedAt,
-        },
-      ],
+      decisions: [],
       generatedAt: context.generatedAt,
     };
 
     const architectureInsights = {
       projectName: context.projectName,
       status: 'pending',
-      architectureStyle: this.inferArchitectureStyle(scanResult),
+      architectureStyle: '',
       businessDomains: [],
       technicalDomains: [],
       relevantFrameworks: context.frameworks,
       relevantTechnologies: context.technologies,
-      dependencyIntent: this.inferDependencyIntent(scanResult),
-      businessIntent: ['Preserve architecture context', 'Support future AI guidance'],
-      codingConventions: codingRules.conventions,
-      securityConcerns: securityRules.concerns,
+      dependencyIntent: [],
+      businessIntent: [],
+      codingConventions: [],
+      securityConcerns: [],
       riskAreas: [],
       missingContext: [],
-      recommendedConstraints: ['Keep architecture knowledge in .pdna files.', 'Do not merge scanner facts with AI insights.'],
-      importantModules: scanResult.sourceDirectories,
-      reasoningSummary: 'Architecture insights will be generated after project overview is captured.',
+      recommendedConstraints: [],
+      importantModules: [],
+      reasoningSummary: '',
       architecturalRecommendations: [],
       generatedAt: context.generatedAt,
     };
@@ -130,34 +119,5 @@ export class ProjectDnaBuilder {
       projectOverview: overviewPath,
       projectDnaDirectory: projectDnaDir,
     };
-  }
-
-  private inferArchitectureStyle(scanResult: ProjectScanResult): string {
-    if (scanResult.detectedFrameworks.some((framework) => framework === 'nextjs' || framework === 'react' || framework === 'vue')) {
-      return 'component-based';
-    }
-
-    if (scanResult.sourceDirectories.length > 0) {
-      return 'layered';
-    }
-
-    return 'unknown';
-  }
-
-  private inferDependencyIntent(scanResult: ProjectScanResult): string[] {
-    const intents: string[] = [];
-    if (scanResult.dependencies.some((dependency) => ['react', 'next', 'vue', 'svelte'].includes(dependency))) {
-      intents.push('UI delivery');
-    }
-    if (scanResult.dependencies.some((dependency) => ['express', 'koa', 'fastify', 'hono'].includes(dependency))) {
-      intents.push('HTTP services');
-    }
-    if (scanResult.dependencies.some((dependency) => ['prisma', 'typeorm', 'mongoose', 'sequelize'].includes(dependency))) {
-      intents.push('Data persistence');
-    }
-    if (intents.length === 0) {
-      intents.push('Project-specific implementation');
-    }
-    return intents;
   }
 }
