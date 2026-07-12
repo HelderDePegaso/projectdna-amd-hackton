@@ -2,8 +2,17 @@ import { Command } from 'commander';
 import { runAskCommand } from '../commands/ask.js';
 import { runInitCommand } from '../commands/init.js';
 import { runProjectOverviewCommand } from '../commands/project-overview.js';
+import { runPromptCommand } from '../commands/prompt.js';
 import { runValidateCommand } from '../commands/validate.js';
 import { Logger } from '../utils/logger.js';
+import type { PromptMode } from '../prompt/prompt-types.js';
+
+function parseIntegerOption(value: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`Expected an integer option value, received: ${value}`);
+  }
+  return Number.parseInt(value, 10);
+}
 
 export function createProgram(): Command {
   debugger
@@ -53,7 +62,29 @@ export function createProgram(): Command {
         process.exitCode = 1;
       }
     });
-
+  program
+    .command('prompt')
+    .description('Generate a project-aware prompt for an external AI coding assistant')
+    .argument('[request...]', 'Natural language request to enrich with Project DNA context')
+    .option('--mode <mode>', 'Prompt mode: fix, feature, refactor, or explain', 'feature')
+    .option('--min-chars <number>', 'Minimum target character count', parseIntegerOption)
+    .option('--max-chars <number>', 'Maximum target character count', parseIntegerOption)
+    .option('--soft-overage <number>', 'Allowed character overflow beyond max-chars', parseIntegerOption)
+    .action(async (requestParts: string[], options: { mode?: string; minChars?: number; maxChars?: number; softOverage?: number }) => {
+      try {
+        const response = await runPromptCommand(process.cwd(), {
+          request: requestParts.join(' '),
+          mode: options.mode as PromptMode,
+          minChars: options.minChars,
+          maxChars: options.maxChars,
+          softOverage: options.softOverage,
+        });
+        logger.success(response);
+      } catch (error) {
+        logger.error(error instanceof Error ? error.message : 'Failed to generate Project DNA prompt');
+        process.exitCode = 1;
+      }
+    });
   const projectCommand = program.command('project').description('Manage Project DNA project knowledge');
   projectCommand
     .command('overview')

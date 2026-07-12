@@ -68,23 +68,27 @@ This makes the system much easier to evolve into a real governance platform.
 ### 2.1 Presentation Layer
 
 Responsibilities:
+
 - Expose command-line interface commands
 - Parse arguments and options
 - Format output to users
 - Delegate to application use cases
 
 Current modules to evolve:
+
 - src/cli/program.ts
 - src/commands/init.ts
 - src/commands/ask.ts
 - src/commands/validate.ts
 
 Responsibilities that should remain here:
+
 - Command parsing
 - Human-friendly output
 - Input validation at the surface level
 
 Responsibilities that must not live here:
+
 - Architectural reasoning
 - Prompt composition
 - Provider execution
@@ -94,6 +98,7 @@ Responsibilities that must not live here:
 ### 2.2 Application Layer
 
 Responsibilities:
+
 - Coordinate use cases
 - Orchestrate subsystem interactions
 - Apply business rules at an application level
@@ -101,6 +106,7 @@ Responsibilities:
 - Encapsulate use-case behavior
 
 New modules to introduce:
+
 - src/application/init-project.use-case.ts
 - src/application/resolve-context.use-case.ts
 - src/application/compose-prompt.use-case.ts
@@ -112,12 +118,14 @@ This layer becomes the primary orchestration boundary between CLI and infra.
 ### 2.3 Domain Layer
 
 Responsibilities:
+
 - Define platform concepts and business entities
 - Hold architecture knowledge models
 - Represent project structure and architectural decisions
 - Contain rules that are independent of frameworks
 
 New modules to introduce:
+
 - src/domain/project-context.ts
 - src/domain/architecture-snapshot.ts
 - src/domain/architecture-insight.ts
@@ -130,15 +138,18 @@ These models should be strongly typed, framework-agnostic, and stable.
 ### 2.4 Infrastructure Layer
 
 Responsibilities:
+
 - Implement persistence, scanning, provider execution, and filesystem interaction
 - Hide technical details behind interfaces
 - Provide adapters to concrete technologies
 
 Existing modules to evolve:
+
 - src/utils/files.ts
 - src/memory/memory-service.ts
 
 New modules to introduce:
+
 - src/infrastructure/scanners/project-scanner.ts
 - src/infrastructure/repositories/file-memory-repository.ts
 - src/infrastructure/providers/claude-provider.ts
@@ -151,6 +162,7 @@ New modules to introduce:
 ### 2.5 Shared Services Layer
 
 Responsibilities:
+
 - Configuration
 - Logging
 - Errors
@@ -159,6 +171,7 @@ Responsibilities:
 - Observability hooks
 
 New modules to introduce:
+
 - src/shared/configuration.service.ts
 - src/shared/error-handler.ts
 - src/shared/telemetry.ts
@@ -171,15 +184,18 @@ New modules to introduce:
 ### 3.1 Project Scanner
 
 Purpose:
+
 - Understand the project structure
 - Read files such as package.json, tsconfig.json, and framework config
 - Discover dependencies and high-level architecture patterns
 - Produce structured metadata without making decisions
 
 Proposed module:
+
 - src/infrastructure/scanners/project-scanner.ts
 
 Responsibilities:
+
 - Read package manifests
 - Extract technology stack information
 - Discover source folders
@@ -187,112 +203,137 @@ Responsibilities:
 - Collect project metadata for later resolution
 
 Important constraint:
+
 - It should not infer architectural decisions or prescribe architecture rules.
 
 ### 3.2 Context Resolver
 
 Purpose:
+
 - Convert raw scanner output into normalized architectural context
 - Organize metadata into a stable shape for memory and reasoning
 
 Proposed module:
+
 - src/application/context-resolver.ts
 
 Responsibilities:
+
 - Normalize discovered data
 - Enrich with defaults
 - Group related information by concern
 - Produce a structured context object for later layers
 
 Important constraint:
+
 - It should not perform architectural reasoning or prompt generation.
 
 ### 3.3 Architecture Memory
 
 Purpose:
+
 - Persist architectural knowledge and project history
 - Provide a repository abstraction for snapshots, rules, and memory records
 
 Existing module to evolve:
+
 - src/memory/memory-service.ts
 
 Proposed abstraction:
+
 - src/domain/ports/memory-repository.ts
 - src/infrastructure/repositories/file-memory-repository.ts
 
 Responsibilities:
+
 - Store architecture snapshots
 - Record project context versions
 - Support future SQLite/vector/cloud storage
 
 Important constraint:
+
 - It stores knowledge; it does not generate it.
 
 ### 3.4 Architecture Intelligence Engine
 
 Purpose:
+
 - Interpret architectural context and produce structured intelligence output
 - Serve as the internal reasoning engine powered by Fireworks
 
 Proposed modules:
+
 - src/domain/ports/architecture-intelligence.ts
 - src/infrastructure/intelligence/fireworks-engine.ts
 
 Responsibilities:
+
 - Understand architecture relationships
 - Interpret context and missing context
 - Select relevant architectural memory
 - Prepare structured guidance for prompt composition
 
 Important constraint:
+
 - It must not generate implementation code.
 - It should return structured architectural guidance data.
 
 ### 3.5 Prompt Composer
 
 Purpose:
+
 - Build the final prompt package for execution providers
 
 Proposed module:
+
 - src/application/prompt-composer.ts
 
 Responsibilities:
+
 - Merge developer request with context, memory, rules, and policies
 - Produce a structured package suitable for providers
 - Add guardrails and instruction sets
 
 Important constraint:
+
 - It should not decide architecture; it should package it.
 
 ### 3.6 AI Providers
 
 Purpose:
+
 - Execute the final prompt package using an external coding assistant
 
 Proposed modules:
+
 - src/domain/ports/execution-provider.ts
 - src/infrastructure/providers/claude-provider.ts
 - src/infrastructure/providers/codex-provider.ts
 - src/infrastructure/providers/gemini-provider.ts
 
 Responsibilities:
+
 - Receive prompt packages
 - Execute external providers
 - Return generated results
 
 Important constraint:
+
 - Providers do not reason about architecture.
 
 ### 3.7 Validation Pipeline
 
 Purpose:
+
 - Validate generated output against architecture rules and project constraints
 
 Proposed modules:
+
 - src/domain/ports/validator.ts
 - src/infrastructure/validators/validator-pipeline.ts
 
 Responsibilities:
+
 - Apply structural checks
 - Enforce rules
 - Return validation results
@@ -300,12 +341,15 @@ Responsibilities:
 ### 3.8 Configuration Service
 
 Purpose:
+
 - Provide typed configuration for providers, storage, plugins, and runtime
 
 Proposed module:
+
 - src/shared/configuration.service.ts
 
 Responsibilities:
+
 - Load .env values
 - Provide defaults
 - Validate configuration using Zod or equivalent
@@ -313,12 +357,15 @@ Responsibilities:
 ### 3.9 Structured Error Handling
 
 Purpose:
+
 - Provide typed errors and safe failure boundaries
 
 Proposed module:
+
 - src/shared/errors.ts
 
 Responsibilities:
+
 - Classify failures
 - Standardize messages
 - Preserve actionable diagnostics
@@ -326,12 +373,15 @@ Responsibilities:
 ### 3.10 Observability Layer
 
 Purpose:
+
 - Support logging, tracing, and future analytics
 
 Proposed module:
+
 - src/shared/telemetry.ts
 
 Responsibilities:
+
 - Emit logs and events
 - Record request lifecycle events
 - Support future dashboards and metrics
@@ -339,12 +389,15 @@ Responsibilities:
 ### 3.11 Plugin Architecture
 
 Purpose:
+
 - Allow future extension points without hard-coding capabilities
 
 Proposed module:
+
 - src/plugins/plugin-manager.ts
 
 Responsibilities:
+
 - Discover plugins
 - Register hooks
 - Manage lifecycle
@@ -554,9 +607,11 @@ The implementation should be phased to avoid major rewrites and reduce risk.
 ### Phase 1 — Harden the existing foundation
 
 Goal:
+
 - Keep current functionality intact while improving structure
 
 Actions:
+
 - Introduce a configuration service
 - Introduce a structured error model
 - Introduce a logging abstraction
@@ -564,125 +619,156 @@ Actions:
 - Keep current CLI commands working without breaking behavior
 
 Why first:
+
 - These are low-risk, high-leverage improvements that prepare the codebase for future growth.
 
 ### Phase 2 — Introduce domain models
 
 Goal:
+
 - Replace raw JSON-like data passing with typed domain entities
 
 Actions:
+
 - Create project context, architecture snapshot, prompt package, and validation result models
 - Update the existing memory and core services to use them
 
 Why second:
+
 - Strong typing makes the system much easier to evolve safely.
 
 ### Phase 3 — Introduce repository abstraction for memory
 
 Goal:
+
 - Make memory storage pluggable
 
 Actions:
+
 - Create a MemoryRepository interface
 - Move the current JSON file persistence behind a FileMemoryRepository adapter
 - Keep the same external behavior
 
 Why third:
+
 - Memory is central to the platform’s value.
 
 ### Phase 4 — Introduce Project Scanner
 
 Goal:
+
 - Replace manual metadata assumptions with real project introspection
 
 Actions:
+
 - Add a scanner that reads package.json, tsconfig.json, and source files
 - Produce a normalized scan result object
 
 Why fourth:
+
 - The scanner becomes the foundation for context resolution and intelligence.
 
 ### Phase 5 — Introduce Context Resolver
 
 Goal:
+
 - Convert raw scan output into structured architecture context
 
 Actions:
+
 - Introduce a resolver that organizes context into a stable schema
 
 Why fifth:
+
 - This is the step that turns raw project discovery into usable architectural context.
 
 ### Phase 6 — Introduce Architecture Intelligence Engine
 
 Goal:
+
 - Add the internal reasoning engine powered by Fireworks
 
 Actions:
+
 - Introduce an engine interface
 - Implement a first adapter for Fireworks
 - Ensure its output is structured and not code generation output
 
 Why sixth:
+
 - This is the core distinction of the platform.
 
 ### Phase 7 — Introduce Prompt Composer
 
 Goal:
+
 - Combine memory, context, and intelligence into a provider-ready package
 
 Actions:
+
 - Build the prompt package structure
 - Tie it to execution providers
 
 Why seventh:
+
 - Prompts should be composed before execution, not ad hoc inside providers.
 
 ### Phase 8 — Introduce execution provider abstraction
 
 Goal:
+
 - Support Claude, Codex, Gemini through a common interface
 
 Actions:
+
 - Create provider adapter interface
 - Implement first provider adapters
 
 Why eighth:
+
 - This enables multiple execution paths without coupling the architecture to one AI backend.
 
 ### Phase 9 — Introduce validation pipeline
 
 Goal:
+
 - Ensure generated output aligns with architectural rules
 
 Actions:
+
 - Introduce validator interfaces and a pipeline executor
 - Add first validation checks
 
 Why ninth:
+
 - Validation is essential for governance.
 
 ### Phase 10 — Introduce plugin architecture and future extensibility hooks
 
 Goal:
+
 - Keep the platform extendable without direct coupling
 
 Actions:
+
 - Introduce a plugin registry and lifecycle hooks
 
 Why tenth:
+
 - This prevents future hard-coded expansion.
 
 ### Phase 11 — Add MCP and dashboard surfaces
 
 Goal:
+
 - Expose the same core application to richer environments
 
 Actions:
+
 - Connect application use cases to MCP and API/dashboard layers
 
 Why eleventh:
+
 - These are best implemented once the core architecture is stable.
 
 ---

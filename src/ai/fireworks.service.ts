@@ -65,7 +65,7 @@ export class FireworksService implements AIProviderPDNA {
     return {
       supportsStructuredOutput: true,
       supportsStatusCheck: true,
-      supportedModes: ['overview-analysis'],
+      supportedModes: ['overview-analysis', 'prompt-enrichment'],
       metadata: {
         model: this.model,
         responseFormat: 'json_object',
@@ -101,7 +101,7 @@ export class FireworksService implements AIProviderPDNA {
         throw error;
       }
 
-      throw new AIProviderExecutionError(this.providerId, 'Fireworks failed to execute project overview analysis.', error);
+      throw new AIProviderExecutionError(this.providerId, `Fireworks failed to execute ${request.mode ?? 'structured'} analysis.`, error);
     }
   }
 

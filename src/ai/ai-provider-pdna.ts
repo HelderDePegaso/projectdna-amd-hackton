@@ -1,4 +1,4 @@
-export type StructuredAnalysisMode = 'overview-analysis';
+export type StructuredAnalysisMode = 'overview-analysis' | 'prompt-enrichment';
 
 export type JsonObject = Record<string, unknown>;
 

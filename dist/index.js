@@ -594,7 +594,7 @@ var FireworksService = class {
     return {
       supportsStructuredOutput: true,
       supportsStatusCheck: true,
-      supportedModes: ["overview-analysis"],
+      supportedModes: ["overview-analysis", "prompt-enrichment"],
       metadata: {
         model: this.model,
         responseFormat: "json_object"
@@ -625,7 +625,7 @@ var FireworksService = class {
       if (error instanceof AIProviderExecutionError) {
         throw error;
       }
-      throw new AIProviderExecutionError(this.providerId, "Fireworks failed to execute project overview analysis.", error);
+      throw new AIProviderExecutionError(this.providerId, `Fireworks failed to execute ${request.mode ?? "structured"} analysis.`, error);
     }
   }
   getClient() {
@@ -1225,6 +1225,242 @@ ${userPrompt}`;
   }
 };
 
+// src/prompt/prompt-builder.ts
+var TECHNOLOGY_LIMIT = 20;
+var DEPENDENCY_LIMIT = 24;
+var PromptBuilder = class {
+  build(input) {
+    const compactContext = this.buildCompactContext(input);
+    const systemPrompt = this.buildSystemPrompt();
+    const userPrompt = this.buildUserPrompt(input, compactContext);
+    return {
+      systemPrompt,
+      userPrompt,
+      markdown: `${systemPrompt}
+
+${userPrompt}`,
+      summary: this.summarize(input.request),
+      metadata: {
+        mode: input.mode,
+        includeSecurity: input.includeSecurity,
+        outputSchema: "prompt-enrichment.json@1.0",
+        contextPacking: "project-dna-prompt-enrichment"
+      }
+    };
+  }
+  buildSystemPrompt() {
+    return [
+      "# 1. System Role",
+      "You are the Project DNA Prompt Enrichment Agent running through Fireworks.",
+      "You are not a code generator and you are not a generic chat assistant.",
+      "Your job is to transform the user request into a project-aware, architecture-aware, domain-aware prompt for an external AI coding assistant.",
+      "",
+      "# 2. Mission",
+      "Infer the relevant project domains and context from the supplied Project DNA artifacts.",
+      "Use that inference to enrich the original user request into a final Markdown prompt.",
+      "Return structured JSON only. The final enriched prompt must be inside enrichedPrompt.markdown.",
+      "",
+      "# 3. Evidence Priority",
+      "- Use scanner facts for technical reality.",
+      "- Use business-context.json for product and business meaning.",
+      "- Use domain-context.json for domain selection and canonical domain names.",
+      "- Use architecture-insights.json for architecture style, constraints, risks, and important modules.",
+      "- Use coding-rules.json, api-conventions.json, and optionally security-rules.json as implementation boundaries.",
+      "- Do not invent dependencies, modules, domains, architecture patterns, or file paths.",
+      "",
+      "# 4. Non-Goals",
+      "- Do not write implementation code.",
+      "- Do not output shell commands.",
+      "- Do not redesign Project DNA.",
+      "- Do not emit markdown outside the required JSON object.",
+      "",
+      "# 5. Missing Context Policy",
+      "If evidence is insufficient, explicitly report missing context in enrichedPrompt.missingContext and confidence.notes."
+    ].join("\n");
+  }
+  buildUserPrompt(input, compactContext) {
+    return [
+      "# User Request",
+      input.request,
+      "",
+      "# Prompt Mode",
+      input.mode,
+      "",
+      "# Prompt Size Targets",
+      this.renderJsonBlock(input.size),
+      "",
+      "# Included Security Rules",
+      String(input.includeSecurity),
+      "",
+      "# Project DNA Context Package",
+      this.renderJsonBlock(compactContext),
+      "",
+      "# Output Contract",
+      this.renderJsonBlock(this.buildOutputContract(input)),
+      "",
+      "# Final Prompt Requirements",
+      "- enrichedPrompt.markdown must be formal English.",
+      "- enrichedPrompt.markdown must include: Task, Relevant Project Context, Relevant Domains, Architecture Notes, Technologies / Dependencies, Coding Constraints, API / Structural Constraints, Expected Outcome, Missing Context.",
+      "- Include Security Constraints only when securityIncluded is true and security evidence exists.",
+      "- Respect minChars, maxChars, and softOverage as practical character targets for enrichedPrompt.markdown.",
+      "- The selectedDomains array must be inferred by Fireworks from the artifacts, not copied blindly.",
+      "- Every selected domain must include evidence from the supplied artifacts."
+    ].join("\n");
+  }
+  buildCompactContext(input) {
+    const scannerReport = this.asObject(input.knowledgeBase.scannerReport);
+    const architectureInsights = this.asObject(input.knowledgeBase.architectureInsights);
+    const dependencies = this.asObject(input.knowledgeBase.dependencies);
+    return {
+      businessContext: input.knowledgeBase.businessContext,
+      domainContext: input.knowledgeBase.domainContext,
+      architectureInsights: {
+        summary: architectureInsights.summary,
+        architectureStyle: architectureInsights.architectureStyle,
+        businessDomains: architectureInsights.businessDomains,
+        technicalDomains: architectureInsights.technicalDomains,
+        businessIntent: architectureInsights.businessIntent,
+        codingConventions: architectureInsights.codingConventions,
+        riskAreas: architectureInsights.riskAreas,
+        missingContext: architectureInsights.missingContext,
+        recommendedConstraints: architectureInsights.recommendedConstraints,
+        importantModules: architectureInsights.importantModules,
+        architecturalRecommendations: architectureInsights.architecturalRecommendations,
+        confidence: architectureInsights.confidence
+      },
+      scannerFacts: {
+        projectName: scannerReport.projectName,
+        packageName: scannerReport.packageName,
+        packageVersion: scannerReport.packageVersion,
+        technologies: this.takeArray(scannerReport.technologies, TECHNOLOGY_LIMIT),
+        detectedFrameworks: this.takeArray(scannerReport.detectedFrameworks, 8),
+        frameworkDetection: scannerReport.frameworkDetection,
+        technologyDetection: this.takeArray(scannerReport.technologyDetection, TECHNOLOGY_LIMIT),
+        sourceDirectories: this.takeArray(scannerReport.sourceDirectories, 20),
+        configFiles: this.takeArray(scannerReport.configFiles, 12)
+      },
+      dependencies: {
+        dependencies: this.takeArray(scannerReport.dependencies ?? dependencies.dependencies, DEPENDENCY_LIMIT),
+        devDependencies: this.takeArray(scannerReport.devDependencies ?? dependencies.devDependencies, 16),
+        dependencyIntent: dependencies.dependencyIntent,
+        scripts: this.takeArray(scannerReport.scripts ?? dependencies.scripts, 16)
+      },
+      codingRules: input.knowledgeBase.codingRules,
+      apiConventions: input.knowledgeBase.apiConventions,
+      securityRules: input.includeSecurity ? input.knowledgeBase.securityRules ?? {} : { omitted: true },
+      decisionLog: this.compactDecisionLog(input.knowledgeBase.decisionLog)
+    };
+  }
+  buildOutputContract(input) {
+    return {
+      schemaVersion: "1.0",
+      generatedAt: "ISO-8601 string",
+      generator: {
+        provider: "fireworks",
+        model: "string",
+        projectDnaVersion: "string"
+      },
+      source: {
+        userRequest: input.request,
+        mode: input.mode,
+        includedArtifacts: ["business-context.json", "domain-context.json", "architecture-insights.json", "scanner-report.json", "dependencies.json", "coding-rules.json", "api-conventions.json", input.includeSecurity ? "security-rules.json" : null].filter(Boolean),
+        securityIncluded: input.includeSecurity
+      },
+      selectedDomains: [{ name: "string", reason: "string", evidence: ["string"] }],
+      relevantContext: {
+        business: ["string"],
+        domain: ["string"],
+        architecture: ["string"],
+        codingRules: ["string"],
+        apiConventions: ["string"],
+        securityRules: ["string"],
+        dependencies: ["string"]
+      },
+      enrichedPrompt: {
+        title: "string",
+        markdown: "string",
+        expectedOutcome: ["string"],
+        warnings: ["string"],
+        missingContext: ["string"]
+      },
+      confidence: {
+        score: "number 0..1",
+        notes: ["string"]
+      }
+    };
+  }
+  compactDecisionLog(value) {
+    const decisionLog = this.asObject(value);
+    return {
+      decisions: this.takeArray(decisionLog.decisions, 12),
+      generatedAt: decisionLog.generatedAt ?? decisionLog.createdAt
+    };
+  }
+  renderJsonBlock(value) {
+    return ["```json", JSON.stringify(value, null, 2), "```"].join("\n");
+  }
+  summarize(value) {
+    const normalized = value.replace(/\s+/g, " ").trim();
+    return normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`;
+  }
+  asObject(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  }
+  takeArray(value, limit) {
+    return Array.isArray(value) ? value.slice(0, limit) : [];
+  }
+};
+
+// src/prompt/prompt-enrichment.schema.ts
+import { z as z3 } from "zod";
+
+// src/prompt/prompt-types.ts
+var PROMPT_MODES = ["fix", "feature", "refactor", "explain"];
+
+// src/prompt/prompt-enrichment.schema.ts
+var PromptEnrichmentSchema = z3.object({
+  schemaVersion: z3.literal("1.0"),
+  generatedAt: z3.string(),
+  generator: z3.object({
+    provider: z3.literal("fireworks"),
+    model: z3.string(),
+    projectDnaVersion: z3.string()
+  }),
+  source: z3.object({
+    userRequest: z3.string(),
+    mode: z3.enum(PROMPT_MODES),
+    includedArtifacts: z3.array(z3.string()),
+    securityIncluded: z3.boolean()
+  }),
+  selectedDomains: z3.array(
+    z3.object({
+      name: z3.string(),
+      reason: z3.string(),
+      evidence: z3.array(z3.string())
+    })
+  ),
+  relevantContext: z3.object({
+    business: z3.array(z3.string()),
+    domain: z3.array(z3.string()),
+    architecture: z3.array(z3.string()),
+    codingRules: z3.array(z3.string()),
+    apiConventions: z3.array(z3.string()),
+    securityRules: z3.array(z3.string()),
+    dependencies: z3.array(z3.string())
+  }),
+  enrichedPrompt: z3.object({
+    title: z3.string(),
+    markdown: z3.string().min(120),
+    expectedOutcome: z3.array(z3.string()),
+    warnings: z3.array(z3.string()),
+    missingContext: z3.array(z3.string())
+  }),
+  confidence: z3.object({
+    score: z3.number().min(0).max(1),
+    notes: z3.array(z3.string())
+  })
+});
+
 // src/ai/pdna-ai.service.ts
 var AIProviderValidationError = class extends Error {
   providerId;
@@ -1232,7 +1468,7 @@ var AIProviderValidationError = class extends Error {
   issues;
   promptPackage;
   constructor(providerId, payload, issues, promptPackage) {
-    super(`Provider ${providerId} returned an invalid architecture insights payload.`);
+    super(`Provider ${providerId} returned an invalid structured payload.`);
     this.name = "AIProviderValidationError";
     this.providerId = providerId;
     this.payload = payload;
@@ -1241,12 +1477,14 @@ var AIProviderValidationError = class extends Error {
   }
 };
 var PDNAAIService = class {
-  constructor(activeProvider, overviewPromptBuilder = new OverviewPromptBuilder()) {
+  constructor(activeProvider, overviewPromptBuilder = new OverviewPromptBuilder(), promptEnrichmentPromptBuilder = new PromptBuilder()) {
     this.activeProvider = activeProvider;
     this.overviewPromptBuilder = overviewPromptBuilder;
+    this.promptEnrichmentPromptBuilder = promptEnrichmentPromptBuilder;
   }
   activeProvider;
   overviewPromptBuilder;
+  promptEnrichmentPromptBuilder;
   setActiveProvider(provider) {
     this.activeProvider = provider;
   }
@@ -1279,6 +1517,38 @@ var PDNAAIService = class {
       promptPackage
     });
     const parsed = ArchitectureInsightsSchema.safeParse(rawResult);
+    if (!parsed.success) {
+      throw new AIProviderValidationError(this.activeProvider.providerId, rawResult, parsed.error.issues, promptPackage);
+    }
+    return parsed.data;
+  }
+  async enrichPrompt(input) {
+    const capabilities = this.activeProvider.getCapabilities();
+    if (!capabilities.supportsStructuredOutput || !capabilities.supportedModes.includes("prompt-enrichment")) {
+      throw new AIProviderExecutionError(
+        this.activeProvider.providerId,
+        `Provider ${this.activeProvider.displayName} does not support structured prompt enrichment.`
+      );
+    }
+    const promptPackage = input.promptPackage ?? this.promptEnrichmentPromptBuilder.build(input);
+    const rawResult = await this.activeProvider.executeStructuredAnalysis({
+      mode: "prompt-enrichment",
+      overview: input.request,
+      contextBundle: {
+        scannerFacts: input.knowledgeBase.scannerReport,
+        architectureContext: input.knowledgeBase.architectureInsights,
+        dependencyContext: input.knowledgeBase.dependencies,
+        businessContext: input.knowledgeBase.businessContext,
+        domainContext: input.knowledgeBase.domainContext,
+        codingRules: input.knowledgeBase.codingRules,
+        securityRules: input.knowledgeBase.securityRules ?? {},
+        apiConventions: input.knowledgeBase.apiConventions,
+        decisionLog: input.knowledgeBase.decisionLog
+      },
+      promptPackage,
+      metadata: input.metadata
+    });
+    const parsed = PromptEnrichmentSchema.safeParse(rawResult);
     if (!parsed.success) {
       throw new AIProviderValidationError(this.activeProvider.providerId, rawResult, parsed.error.issues, promptPackage);
     }
@@ -1584,19 +1854,299 @@ var ProjectOverviewUseCase = class {
   }
 };
 
+// src/application/prompt.use-case.ts
+import fs8 from "fs-extra";
+import path10 from "path";
+import readline2 from "readline/promises";
+
+// src/prompt/prompt-persistence.service.ts
+import fs7 from "fs-extra";
+import path9 from "path";
+var PromptPersistenceService = class {
+  async save(pdnaDir, result, promptPackage, size) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const fileStamp = timestamp.replace(/[:.]/g, "-");
+    const promptsDir = path9.join(pdnaDir, "prompts");
+    const logsDir = path9.join(pdnaDir, "logs", "prompt");
+    await fs7.ensureDir(promptsDir);
+    await fs7.ensureDir(logsDir);
+    const promptPath = path9.join(promptsDir, `${fileStamp}-${result.source.mode}.md`);
+    const jsonPath = path9.join(promptsDir, `${fileStamp}-${result.source.mode}.json`);
+    const logPath = path9.join(logsDir, `${fileStamp}-${result.source.mode}.md`);
+    await fs7.writeFile(promptPath, result.enrichedPrompt.markdown, "utf8");
+    await fs7.writeJson(jsonPath, result, { spaces: 2 });
+    await fs7.writeFile(logPath, this.renderLog(timestamp, result, promptPath, jsonPath, promptPackage, size), "utf8");
+    return { promptPath, logPath, jsonPath };
+  }
+  async saveFailure(pdnaDir, input) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const fileStamp = timestamp.replace(/[:.]/g, "-");
+    const promptsDir = path9.join(pdnaDir, "prompts");
+    const logsDir = path9.join(pdnaDir, "logs", "prompt");
+    await fs7.ensureDir(promptsDir);
+    await fs7.ensureDir(logsDir);
+    const fallbackPath = path9.join(promptsDir, `${fileStamp}-${input.mode}.failed.json`);
+    const logPath = path9.join(logsDir, `${fileStamp}-${input.mode}.failed.md`);
+    await fs7.writeJson(fallbackPath, {
+      generatedAt: timestamp,
+      providerId: input.providerId,
+      userRequest: input.request,
+      validationIssues: input.issues,
+      payload: input.payload
+    }, { spaces: 2 });
+    await fs7.writeFile(logPath, this.renderFailureLog(timestamp, input, fallbackPath), "utf8");
+    return { fallbackPath, logPath };
+  }
+  renderLog(timestamp, result, promptPath, jsonPath, promptPackage, size) {
+    return [
+      "# Project DNA Prompt Run",
+      "",
+      `- Workflow start: ${timestamp}`,
+      `- Provider: ${result.generator.provider}`,
+      `- Model: ${result.generator.model}`,
+      `- Mode: ${result.source.mode}`,
+      `- User request summary: ${this.summarize(result.source.userRequest)}`,
+      `- Selected domains: ${result.selectedDomains.length > 0 ? result.selectedDomains.map((domain) => domain.name).join(", ") : "(none)"}`,
+      `- Selected artifacts: ${result.source.includedArtifacts.join(", ")}`,
+      `- Security included: ${result.source.securityIncluded}`,
+      `- Prompt size target: min ${size.minChars}, max ${size.maxChars}, soft overage ${size.softOverage}`,
+      `- Generated output location: ${promptPath}`,
+      `- Generated JSON location: ${jsonPath}`,
+      `- Generated characters: ${result.enrichedPrompt.markdown.length}`,
+      "",
+      "## Condensed Prompt Sent to Fireworks",
+      "````markdown",
+      this.truncate(promptPackage.markdown, 12e3),
+      "````",
+      "",
+      "## Missing Context",
+      ...result.enrichedPrompt.missingContext.length > 0 ? result.enrichedPrompt.missingContext.map((item) => `- ${item}`) : ["- None detected."],
+      "",
+      "## Warnings",
+      ...result.enrichedPrompt.warnings.length > 0 ? result.enrichedPrompt.warnings.map((item) => `- ${item}`) : ["- None."],
+      ""
+    ].join("\n");
+  }
+  renderFailureLog(timestamp, input, fallbackPath) {
+    return [
+      "# Project DNA Prompt Run Failed",
+      "",
+      `- Workflow start: ${timestamp}`,
+      `- Provider: ${input.providerId}`,
+      `- Mode: ${input.mode}`,
+      `- User request summary: ${this.summarize(input.request)}`,
+      `- Prompt size target: min ${input.size.minChars}, max ${input.size.maxChars}, soft overage ${input.size.softOverage}`,
+      `- Fallback output location: ${fallbackPath}`,
+      "",
+      "## Validation Issues",
+      ...input.issues.length > 0 ? input.issues.map((issue) => `- ${issue}`) : ["- Unknown validation issue."],
+      "",
+      "## Condensed Prompt Sent to Fireworks",
+      "````markdown",
+      this.truncate(input.promptPackage.markdown, 12e3),
+      "````",
+      ""
+    ].join("\n");
+  }
+  summarize(value) {
+    const normalized = value.replace(/\s+/g, " ").trim();
+    return normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`;
+  }
+  truncate(value, maxLength) {
+    if (value.length <= maxLength) return value;
+    return `${value.slice(0, maxLength - 32)}
+...truncated for markdown log...`;
+  }
+};
+
+// src/application/prompt.use-case.ts
+var REQUIRED_PROMPT_FILES = [
+  "dependencies.json",
+  "business-context.json",
+  "domain-context.json",
+  "coding-rules.json",
+  "api-conventions.json",
+  "decision-log.json",
+  "scanner-report.json",
+  "architecture-insights.json"
+];
+var DEFAULT_SIZE = {
+  minChars: 1400,
+  maxChars: 5e3,
+  softOverage: 600
+};
+var PromptUseCase = class {
+  constructor(validationService = new ProjectValidationService(), aiService = new PDNAAIService(new FireworksService()), promptBuilder = new PromptBuilder(), persistenceService = new PromptPersistenceService()) {
+    this.validationService = validationService;
+    this.aiService = aiService;
+    this.promptBuilder = promptBuilder;
+    this.persistenceService = persistenceService;
+  }
+  validationService;
+  aiService;
+  promptBuilder;
+  persistenceService;
+  async execute(projectRoot, options = {}) {
+    const absoluteRoot = path10.resolve(projectRoot);
+    await this.validationService.validateWorkspace(absoluteRoot);
+    const pdnaDir = path10.join(absoluteRoot, ".pdna");
+    await this.ensureProjectDnaInitialized(pdnaDir, Boolean(options.includeSecurity));
+    const request = await this.resolveRequest(options.request);
+    if (request.trim().length === 0) {
+      throw new ProjectDnaError("No prompt request was provided.");
+    }
+    const mode = this.resolveMode(options.mode);
+    const size = this.resolveSize(options);
+    const includeSecurity = Boolean(options.includeSecurity);
+    const knowledgeBase = await this.loadKnowledgeBase(pdnaDir, includeSecurity);
+    const buildInput = {
+      knowledgeBase,
+      request,
+      mode,
+      size,
+      includeSecurity,
+      metadata: {
+        projectRoot: absoluteRoot,
+        projectDnaDir: pdnaDir
+      }
+    };
+    const promptPackage = this.promptBuilder.build(buildInput);
+    try {
+      const enrichment = await this.aiService.enrichPrompt({
+        ...buildInput,
+        promptPackage
+      });
+      const persistence = await this.persistenceService.save(pdnaDir, enrichment, promptPackage, size);
+      return {
+        promptPath: persistence.promptPath,
+        logPath: persistence.logPath,
+        jsonPath: persistence.jsonPath,
+        mode,
+        charCount: enrichment.enrichedPrompt.markdown.length,
+        selectedDomains: enrichment.selectedDomains.map((domain) => domain.name),
+        status: "updated"
+      };
+    } catch (error) {
+      if (error instanceof AIProviderValidationError) {
+        const failure = await this.persistenceService.saveFailure(pdnaDir, {
+          mode,
+          request,
+          providerId: error.providerId,
+          payload: error.payload,
+          issues: error.issues.map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`),
+          promptPackage,
+          size
+        });
+        return {
+          promptPath: failure.fallbackPath,
+          logPath: failure.logPath,
+          mode,
+          charCount: 0,
+          selectedDomains: [],
+          status: "failed"
+        };
+      }
+      throw error;
+    }
+  }
+  async resolveRequest(request) {
+    if (typeof request === "string" && request.trim().length > 0) {
+      return request.trim();
+    }
+    const rl = readline2.createInterface({ input: process.stdin, output: process.stdout });
+    try {
+      return (await rl.question("Describe the request to turn into a Project DNA prompt:\n")).trim();
+    } finally {
+      rl.close();
+    }
+  }
+  resolveMode(mode) {
+    if (!mode) return "feature";
+    if (PROMPT_MODES.includes(mode)) return mode;
+    throw new ProjectDnaError(`Invalid prompt mode "${mode}". Expected one of: ${PROMPT_MODES.join(", ")}.`);
+  }
+  resolveSize(options) {
+    const minChars = this.positiveInteger(options.minChars, DEFAULT_SIZE.minChars);
+    const maxChars = this.positiveInteger(options.maxChars, DEFAULT_SIZE.maxChars);
+    const softOverage = this.nonNegativeInteger(options.softOverage, DEFAULT_SIZE.softOverage);
+    if (maxChars < minChars) {
+      throw new ProjectDnaError("Invalid prompt size options: --max-chars must be greater than or equal to --min-chars.");
+    }
+    return { minChars, maxChars, softOverage };
+  }
+  async ensureProjectDnaInitialized(pdnaDir, includeSecurity) {
+    if (!await fs8.pathExists(pdnaDir)) {
+      throw new ProjectDnaError("Project DNA has not been initialized. Run `pdna init` before generating prompts.");
+    }
+    const missingFiles = [];
+    for (const fileName of REQUIRED_PROMPT_FILES) {
+      if (!await fs8.pathExists(path10.join(pdnaDir, fileName))) {
+        missingFiles.push(fileName);
+      }
+    }
+    if (includeSecurity && !await fs8.pathExists(path10.join(pdnaDir, "security-rules.json"))) {
+      missingFiles.push("security-rules.json");
+    }
+    if (missingFiles.length > 0) {
+      throw new ProjectDnaError(
+        `Project DNA initialization is incomplete. Run \`pdna init\` before generating prompts. Missing: ${missingFiles.join(", ")}`
+      );
+    }
+  }
+  async loadKnowledgeBase(pdnaDir, includeSecurity) {
+    return {
+      dependencies: await this.readRequiredJson(pdnaDir, "dependencies.json"),
+      businessContext: await this.readRequiredJson(pdnaDir, "business-context.json"),
+      domainContext: await this.readRequiredJson(pdnaDir, "domain-context.json"),
+      codingRules: await this.readRequiredJson(pdnaDir, "coding-rules.json"),
+      securityRules: includeSecurity ? await this.readRequiredJson(pdnaDir, "security-rules.json") : {},
+      apiConventions: await this.readRequiredJson(pdnaDir, "api-conventions.json"),
+      decisionLog: await this.readRequiredJson(pdnaDir, "decision-log.json"),
+      scannerReport: await this.readRequiredJson(pdnaDir, "scanner-report.json"),
+      architectureInsights: await this.readRequiredJson(pdnaDir, "architecture-insights.json")
+    };
+  }
+  async readRequiredJson(pdnaDir, fileName) {
+    try {
+      const value = await fs8.readJson(path10.join(pdnaDir, fileName));
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return value;
+      }
+      throw new ProjectDnaError(`Invalid ${fileName}: expected a JSON object.`);
+    } catch (error) {
+      if (error instanceof ProjectDnaError) {
+        throw error;
+      }
+      throw new ProjectDnaError(`Unable to load ${fileName}: ${error instanceof Error ? error.message : "unknown error"}`);
+    }
+  }
+  positiveInteger(value, fallback) {
+    if (value === void 0) return fallback;
+    if (Number.isInteger(value) && value > 0) return value;
+    throw new ProjectDnaError("Prompt size options must be positive integers.");
+  }
+  nonNegativeInteger(value, fallback) {
+    if (value === void 0) return fallback;
+    if (Number.isInteger(value) && value >= 0) return value;
+    throw new ProjectDnaError("Prompt soft overage must be a non-negative integer.");
+  }
+};
+
 // src/core/project-dna-service.ts
 var ProjectDnaService = class {
-  constructor(initializeProjectUseCase = new InitializeProjectUseCase(), askContextUseCase = new AskContextUseCase(), validateOutputUseCase = new ValidateOutputUseCase(), projectOverviewUseCase = new ProjectOverviewUseCase(), logger = new Logger()) {
+  constructor(initializeProjectUseCase = new InitializeProjectUseCase(), askContextUseCase = new AskContextUseCase(), validateOutputUseCase = new ValidateOutputUseCase(), projectOverviewUseCase = new ProjectOverviewUseCase(), promptUseCase = new PromptUseCase(), logger = new Logger()) {
     this.initializeProjectUseCase = initializeProjectUseCase;
     this.askContextUseCase = askContextUseCase;
     this.validateOutputUseCase = validateOutputUseCase;
     this.projectOverviewUseCase = projectOverviewUseCase;
+    this.promptUseCase = promptUseCase;
     this.logger = logger;
   }
   initializeProjectUseCase;
   askContextUseCase;
   validateOutputUseCase;
   projectOverviewUseCase;
+  promptUseCase;
   logger;
   async initialize(projectRoot) {
     this.logger.info("Initializing Project DNA...");
@@ -1623,6 +2173,12 @@ var ProjectDnaService = class {
     }
     return "Project overview stored and architecture insights updated successfully.";
   }
+  async prompt(projectRoot, options) {
+    this.logger.info(`Building Project DNA prompt for ${projectRoot}`);
+    const result = await this.promptUseCase.execute(projectRoot, options);
+    const domains = result.selectedDomains.length > 0 ? result.selectedDomains.join(", ") : "no specific domain selected";
+    return `Prompt generated successfully at ${result.promptPath}. Log saved at ${result.logPath}. Mode: ${result.mode}. Domains: ${domains}. Characters: ${result.charCount}.`;
+  }
 };
 
 // src/commands/ask.ts
@@ -1643,6 +2199,12 @@ async function runProjectOverviewCommand(projectRoot) {
   return service.projectOverview(projectRoot);
 }
 
+// src/commands/prompt.ts
+async function runPromptCommand(projectRoot, options) {
+  const service = new ProjectDnaService();
+  return service.prompt(projectRoot, options);
+}
+
 // src/commands/validate.ts
 async function runValidateCommand(projectRoot) {
   const service = new ProjectDnaService();
@@ -1650,6 +2212,12 @@ async function runValidateCommand(projectRoot) {
 }
 
 // src/cli/program.ts
+function parseIntegerOption(value) {
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`Expected an integer option value, received: ${value}`);
+  }
+  return Number.parseInt(value, 10);
+}
 function createProgram() {
   debugger;
   const program2 = new Command();
@@ -1679,6 +2247,21 @@ function createProgram() {
       logger.info(response);
     } catch (error) {
       logger.error(error instanceof Error ? error.message : "Failed to validate Project DNA");
+      process.exitCode = 1;
+    }
+  });
+  program2.command("prompt").description("Generate a project-aware prompt for an external AI coding assistant").argument("[request...]", "Natural language request to enrich with Project DNA context").option("--mode <mode>", "Prompt mode: fix, feature, refactor, or explain", "feature").option("--min-chars <number>", "Minimum target character count", parseIntegerOption).option("--max-chars <number>", "Maximum target character count", parseIntegerOption).option("--soft-overage <number>", "Allowed character overflow beyond max-chars", parseIntegerOption).action(async (requestParts, options) => {
+    try {
+      const response = await runPromptCommand(process.cwd(), {
+        request: requestParts.join(" "),
+        mode: options.mode,
+        minChars: options.minChars,
+        maxChars: options.maxChars,
+        softOverage: options.softOverage
+      });
+      logger.success(response);
+    } catch (error) {
+      logger.error(error instanceof Error ? error.message : "Failed to generate Project DNA prompt");
       process.exitCode = 1;
     }
   });

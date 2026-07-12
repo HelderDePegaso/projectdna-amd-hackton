@@ -2,8 +2,10 @@ import { AskContextUseCase } from '../application/ask-context.use-case.js';
 import { InitializeProjectUseCase } from '../application/initialize-project.use-case.js';
 import { ValidateOutputUseCase } from '../application/validate-output.use-case.js';
 import { ProjectOverviewUseCase } from '../application/project-overview.use-case.js';
+import { PromptUseCase } from '../application/prompt.use-case.js';
 import { Logger } from '../utils/logger.js';
 import type { ProjectDnaFiles } from '../domain/models.js';
+import type { PromptCommandOptions } from '../prompt/prompt-types.js';
 
 export class ProjectDnaService {
   constructor(
@@ -11,6 +13,7 @@ export class ProjectDnaService {
     private readonly askContextUseCase: AskContextUseCase = new AskContextUseCase(),
     private readonly validateOutputUseCase: ValidateOutputUseCase = new ValidateOutputUseCase(),
     private readonly projectOverviewUseCase: ProjectOverviewUseCase = new ProjectOverviewUseCase(),
+    private readonly promptUseCase: PromptUseCase = new PromptUseCase(),
     private readonly logger: Logger = new Logger(),
   ) {}
 
@@ -44,5 +47,12 @@ export class ProjectDnaService {
     }
 
     return 'Project overview stored and architecture insights updated successfully.';
+  }
+
+  public async prompt(projectRoot: string, options: PromptCommandOptions): Promise<string> {
+    this.logger.info(`Building Project DNA prompt for ${projectRoot}`);
+    const result = await this.promptUseCase.execute(projectRoot, options);
+    const domains = result.selectedDomains.length > 0 ? result.selectedDomains.join(', ') : 'no specific domain selected';
+    return `Prompt generated successfully at ${result.promptPath}. Log saved at ${result.logPath}. Mode: ${result.mode}. Domains: ${domains}. Characters: ${result.charCount}.`;
   }
 }
